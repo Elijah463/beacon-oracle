@@ -16,7 +16,7 @@
  *
  * CIRCUIT BREAKER (on-chain):
  *   The contract's circuit breaker trips when a single submitted update
- *   would move the on-chain price by more than circuitBreakerBps (default 10%).
+ *   would move the on-chain price by more than circuitBreakerBps (default 50%).
  *   When it trips:
  *     - The contract sets circuitBreakerTripped = true and emits CircuitBreakerTripped.
  *     - All subsequent transmit() calls revert with CircuitBreakerActive().
