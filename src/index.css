@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── BEACON Design Tokens ──────────────────────────────────────────────── */
+:root {
+  /* Brand */
+  --brand:          #00D66F;
+  --brand-dark:     #00b85f;
+  --brand-light:    #e6fff3;
+  --brand-muted:    rgba(0, 214, 111, 0.12);
+  --brand-border:   rgba(0, 214, 111, 0.25);
+
+  /* Backgrounds */
+  --bg:             #F5F7FA;
+  --bg-card:        #FFFFFF;
+  --bg-muted:       #EEF1F6;
+  --bg-hover:       #F0F4F8;
+
+  /* Text */
+  --ink:            #0F1923;
+  --ink-2:          #1E2D3D;
+  --muted:          #4B5563;
+  --subtle:         #8B95A1;
+  --placeholder:    #B0BAC5;
+
+  /* Borders */
+  --border:         rgba(0, 0, 0, 0.07);
+  --border-strong:  rgba(0, 0, 0, 0.13);
+
+  /* Semantic */
+  --success:        #00D66F;
+  --success-bg:     rgba(0, 214, 111, 0.10);
+  --danger:         #EF4444;
+  --danger-bg:      rgba(239, 68, 68, 0.08);
+  --warning:        #F59E0B;
+  --warning-bg:     rgba(245, 158, 11, 0.10);
+
+  /* Flash animation colors */
+  --flash-up:       #00D66F;
+  --flash-down:     #EF4444;
+
+  /* Shadows */
+  --shadow-sm:      0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:      0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg:      0 10px 30px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.04);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Typography */
+.display {
+  font-family: 'Space Grotesk', 'DM Sans', sans-serif;
+  letter-spacing: -0.03em;
+}
+.mono {
+  font-family: 'JetBrains Mono', 'Menlo', monospace;
+  letter-spacing: -0.02em;
+}
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* Price flash animations */
+@keyframes flash-up {
+  0%   { color: var(--flash-up); }
+  60%  { color: var(--flash-up); }
+  100% { color: inherit; }
+}
+@keyframes flash-down {
+  0%   { color: var(--flash-down); }
+  60%  { color: var(--flash-down); }
+  100% { color: inherit; }
+}
+.price-flash-up   { animation: flash-up   2s ease-out forwards; }
+.price-flash-down { animation: flash-down 2s ease-out forwards; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--subtle); }

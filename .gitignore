@@ -1,0 +1,46 @@
+# Environment -- NEVER commit real credentials
+.env
+.env.local
+.env.*.local
+console.jsonl
+traces.jsonl
+
+# Dependency directories
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+out/
+
+# Foundry artifacts and cache
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+
+# Bun
+.bun/
+bun.lockb
+
+# Circle credentials and recovery files
+.circle/
+recovery_file*.dat
+
+# IDE and OS
+.DS_Store
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+*.log
+/tmp/
+
+# TypeScript incremental build info
+*.tsbuildinfo
