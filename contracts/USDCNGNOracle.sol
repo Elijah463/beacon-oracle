@@ -47,7 +47,7 @@ library OracleErrors {
  *   - Deviation threshold: off-chain hint stored on-chain; reporter skips gas when below it.
  *   - Circuit breaker    : transmit() trips the breaker and RETURNS (not reverts) when a single
  *                          update exceeds circuitBreakerBps. Flag persists. Owner resets manually.
- *   - Strict timestamps  : each round's timestamp must be strictly greater than the prior round.
+ *   - Timestamps         : each round's timestamp must be non-decreasing (>= prior round's updatedAt).
  *   - Ownable2Step       : ownership transfer requires acceptance; renounceOwnership is blocked.
  *   - UUPS upgradeable   : only the owner can authorize an upgrade.
  */
@@ -311,11 +311,11 @@ contract USDCNGNOracle is
      * so the state change is committed. The reporter sees a successful tx with a
      * CircuitBreakerTripped event and knows no new round was stored.
      *
-     * FINDING 8 FIX: timestamp must be strictly greater than the previous round's updatedAt,
-     * and no older than maxStaleness from the current block (window is 1x, not 2x).
+     * Timestamp must be non-decreasing (>= last updatedAt) to handle Arc same-block timestamps.
+     * Timestamp window: must be <= block.timestamp and >= block.timestamp - maxStaleness.
      *
      * @param answer    The reported USDC/NGN price with 8 decimals (must be > 0).
-     * @param timestamp Data timestamp (must be > last updatedAt, <= block.timestamp, >= block.timestamp - maxStaleness).
+     * @param timestamp Data timestamp (must be >= last updatedAt, <= block.timestamp, >= block.timestamp - maxStaleness).
      */
     function transmit(int256 answer, uint256 timestamp) external onlyReporter whenNotPaused {
         if (circuitBreakerTripped) revert OracleErrors.CircuitBreakerActive();
@@ -326,8 +326,11 @@ contract USDCNGNOracle is
         if (latestRoundIdCounter != 0) {
             RoundData memory latest = _getRoundDataById(_toUint80(latestRoundIdCounter));
 
-            // Strictly increasing timestamps -- no tie allowed.
-            if (timestamp <= latest.updatedAt) revert OracleErrors.InvalidTimestamp();
+            // Timestamps must be non-decreasing. On Arc, consecutive blocks may share
+            // the same block.timestamp, so we allow equal timestamps here.
+            // Round counter monotonicity (latestRoundIdCounter always increments) provides
+            // the secondary ordering guarantee for consumers.
+            if (timestamp < latest.updatedAt) revert OracleErrors.InvalidTimestamp();
 
             uint256 deviationBps = _calculateDeviationBps(latest.answer, answer);
             if (deviationBps > circuitBreakerBps) {
@@ -418,11 +421,17 @@ contract USDCNGNOracle is
      *      move (e.g. a real devaluation) that the owner has verified off-chain.
      *      Prevents the feed from being permanently bricked by a valid price move.
      * @param answer    Owner-verified price with 8 decimals (must be > 0).
-     * @param timestamp Data timestamp (must be <= block.timestamp and within maxStaleness).
+     * @param timestamp Data timestamp (must be >= last round updatedAt, <= block.timestamp, within maxStaleness).
      */
     function resetCircuitBreakerAndPublish(int256 answer, uint256 timestamp) external onlyOwner whenNotPaused {
         if (answer <= 0) revert OracleErrors.InvalidAnswer();
         _enforceTimestampWindow(timestamp);
+
+        // Ensure non-decreasing timestamp ordering (same rule as transmit).
+        if (latestRoundIdCounter != 0) {
+            RoundData memory latest = _getRoundDataById(_toUint80(latestRoundIdCounter));
+            if (timestamp < latest.updatedAt) revert OracleErrors.InvalidTimestamp();
+        }
 
         circuitBreakerTripped = false;
 

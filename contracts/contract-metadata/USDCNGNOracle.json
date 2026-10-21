@@ -1,13 +1,27 @@
 {
-  "contractAddress": "0x5147ebbc5d7124a27325a0ea04f6b552410ec90d",
+  "contractAddress": "0xfacb599c862322229a1861df76a7fbf26ebf9f55",
   "network": "ARC-TESTNET",
   "deployerWalletId": "3c2464b2-8369-52e2-a782-800bbeca5396",
   "contract_code_path": "/home/user/app/contracts/USDCNGNOracle.sol",
   "contract_compiled_code_path": "/home/user/app/contracts/out/USDCNGNOracle.sol/USDCNGNOracle.json",
   "contract_network_and_links": {
-    "Arc Testnet": "https://explorer.testnet.arc.io/address/0x5147ebbc5d7124a27325a0ea04f6b552410ec90d"
+    "Arc Testnet": "https://explorer.testnet.arc.io/address/0xfacb599c862322229a1861df76a7fbf26ebf9f55"
   },
   "contract_deployments": [
+    {
+      "chain": "Arc Testnet",
+      "address": "0xfacb599c862322229a1861df76a7fbf26ebf9f55",
+      "explorerUrl": "https://explorer.testnet.arc.io/address/0xfacb599c862322229a1861df76a7fbf26ebf9f55",
+      "txHash": "0x7c33139d023d4a4fb94305b5820cde1ee4c44b4631fe72054cf6a2d2d49caf56",
+      "deployedAt": "2026-10-21T21:51:11.626Z"
+    },
+    {
+      "chain": "Arc Testnet",
+      "address": "0x5147ebbc5d7124a27325a0ea04f6b552410ec90d",
+      "explorerUrl": "https://explorer.testnet.arc.io/address/0x5147ebbc5d7124a27325a0ea04f6b552410ec90d",
+      "txHash": "0x0d58e4133d23318d287fe3f8bdda95421d98f0532264fc595e726cf8991fa1af",
+      "deployedAt": "2026-10-21T21:33:42.344Z"
+    },
     {
       "chain": "Arc Testnet",
       "address": "0x5147ebbc5d7124a27325a0ea04f6b552410ec90d",
