@@ -1,332 +1,368 @@
 /**
  * reporter.ts
  * -----------
- * Off-chain price reporter for the BEACON USDC/NGN oracle.
+ * BEACON off-chain price reporter -- Chainlink-style submission rules.
  *
- * Uses a Circle developer-controlled wallet (EOA on ARC-TESTNET) to call
- * transmit() on the USDCNGNOracle contract. No raw private key is ever held
- * in this process -- Circle's SDK handles signing server-side.
+ * CYCLE: every 30 seconds, fetch both price legs simultaneously,
+ *        derive USDC/NGN, then decide whether to publish on-chain.
  *
- * Prerequisites:
- *   CIRCLE_API_KEY             -- Circle Standard Developer API key
- *   CIRCLE_ENTITY_SECRET       -- Registered 32-byte entity secret
- *   REPORTER_WALLET_ID         -- Wallet ID from setup-reporter-wallet.ts
- *   VITE_ORACLE_CONTRACT_ADDRESS -- Deployed proxy address
- *   EXCHANGE_RATE_API_KEY      -- ExchangeRate-API key (free tier)
+ * PUBLISH RULES (Chainlink-style):
+ *   1. DEVIATION GATE: only publish if the new price deviates >= 0.2% from the
+ *      last successfully published on-chain price.
+ *   2. HEARTBEAT: if the price has stayed within 0.2% for >= 1 hour without
+ *      a publish, force a publish regardless (heartbeat trigger). This uses
+ *      the most recently derived 30-second price round, not the first one.
+ *   3. FIRST ROUND: always publish -- no prior price to compare.
  *
- * Run:
- *   bun run scripts/reporter.ts
+ * CIRCUIT BREAKER (on-chain):
+ *   The contract's circuit breaker trips when a single submitted update
+ *   would move the on-chain price by more than circuitBreakerBps (default 10%).
+ *   When it trips:
+ *     - The contract sets circuitBreakerTripped = true and emits CircuitBreakerTripped.
+ *     - All subsequent transmit() calls revert with CircuitBreakerActive().
+ *     - The reporter detects this, logs a loud alert, and exits.
+ *   To recover:
+ *     - The oracle owner must call resetCircuitBreaker() OR
+ *       resetCircuitBreakerAndPublish(verifiedAnswer, timestamp) on the contract.
+ *     - resetCircuitBreakerAndPublish is preferred: it atomically accepts the
+ *       verified large move and resets the breaker so the feed resumes cleanly.
+ *     - After reset, restart this reporter process.
  *
- * Security fixes applied:
- *   FINDING 3:  Strictly serialized loop -- recursive setTimeout, never setInterval.
- *   FINDING 4:  Heartbeat capped at min(1800, onChainMaxStaleness / 2).
- *   FINDING 5:  USD/NGN cached for 1 hour -- well within free-tier API limits.
- *   FINDING 6:  USD/NGN quorum of 2. Outlier rejection on both legs.
- *   FINDING 7:  Timestamp clamped to latest on-chain block time.
- *   FINDING 11: On-chain read errors surface explicitly and back off.
- *   FINDING 13: All arithmetic uses BigInt -- no floating-point multiplication.
- *   FINDING 16: Error messages never include URLs (no API key leakage in logs).
+ * USES Circle developer-controlled wallet -- no raw private key in this process.
+ *
+ * Prerequisites (set in .env):
+ *   CIRCLE_API_KEY                -- Circle Standard Developer API key
+ *   CIRCLE_ENTITY_SECRET          -- Registered 32-byte entity secret
+ *   REPORTER_WALLET_ID            -- Wallet ID from scripts/setup-reporter-wallet.ts
+ *   VITE_ORACLE_CONTRACT_ADDRESS  -- Deployed BEACON proxy address on Arc Testnet
  */
 
 import { initiateDeveloperControlledWalletsClient } from '@circle-fin/developer-controlled-wallets'
 import { createPublicClient, http } from 'viem'
+import { arcTestnet } from 'viem/chains'
 
 import {
-  fetchUsdcUsdBinance,
   fetchUsdcUsdCoinbase,
-  fetchUsdcUsdKraken,
-  fetchUsdNgnExchangeRateApi,
-  fetchUsdNgnOpenExchangeRates,
+  fetchUsdcUsdBinance,
+  fetchUsdcUsdOKX,
+  fetchUsdcUsdBitget,
+  fetchUsdcUsdBybit,
+  fetchNgnUsdtBinanceP2P,
+  fetchNgnUsdtQuidax,
+  fetchNgnUsdtBybitP2P,
+  fetchNgnUsdtBitgetP2P,
   fetchAll,
   median,
   rejectOutliers,
 } from './price-sources.js'
-import type { SourceResult } from './price-sources.js'
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
-const CIRCLE_API_KEY      = process.env.CIRCLE_API_KEY ?? ''
+const CIRCLE_API_KEY       = process.env.CIRCLE_API_KEY ?? ''
 const CIRCLE_ENTITY_SECRET = process.env.CIRCLE_ENTITY_SECRET
   ?? process.env.ENTITY_SECRET
   ?? process.env.CIRCLE_SCP_ENTITY_SECRET
   ?? ''
 const REPORTER_WALLET_ID   = process.env.REPORTER_WALLET_ID ?? ''
 const CONTRACT_ADDRESS     = (process.env.VITE_ORACLE_CONTRACT_ADDRESS ?? '') as `0x${string}`
-const EXCHANGE_RATE_API_KEY   = process.env.EXCHANGE_RATE_API_KEY ?? ''
-const OPEN_EXCHANGE_RATES_ID  = process.env.OPEN_EXCHANGE_RATES_APP_ID ?? ''
 
 if (!CIRCLE_API_KEY)       { console.error('[BEACON] CIRCLE_API_KEY not set');       process.exit(1) }
 if (!CIRCLE_ENTITY_SECRET) { console.error('[BEACON] CIRCLE_ENTITY_SECRET not set'); process.exit(1) }
 if (!REPORTER_WALLET_ID)   { console.error('[BEACON] REPORTER_WALLET_ID not set');   process.exit(1) }
 if (!CONTRACT_ADDRESS)     { console.error('[BEACON] VITE_ORACLE_CONTRACT_ADDRESS not set'); process.exit(1) }
-if (!EXCHANGE_RATE_API_KEY) { console.warn('[BEACON] EXCHANGE_RATE_API_KEY not set -- USD/NGN leg may fail') }
 
 // ---------------------------------------------------------------------------
 // Clients
 // ---------------------------------------------------------------------------
 
-// Circle developer-controlled wallets SDK -- handles signing server-side
 const circleClient = initiateDeveloperControlledWalletsClient({
   apiKey: CIRCLE_API_KEY,
   entitySecret: CIRCLE_ENTITY_SECRET,
 })
 
-// RPC client -- prefer Arc Studio proxy, fall back to public Arc Testnet RPC
-const proxyChains = (process.env.RPC_PROXY_CHAINS ?? '').split(',')
 const rpcUrl: string =
-  process.env.RPC_PROXY_BASE_URL && proxyChains.includes('Arc_Testnet')
+  process.env.RPC_PROXY_BASE_URL &&
+  (process.env.RPC_PROXY_CHAINS ?? '').split(',').includes('Arc_Testnet')
     ? `${process.env.RPC_PROXY_BASE_URL}/api/rpc/Arc_Testnet?_rpc_token=${process.env.RPC_PROXY_TOKEN}`
     : 'https://rpc.testnet.arc.io'
 
-const publicClient = createPublicClient({ transport: http(rpcUrl) })
+const publicClient = createPublicClient({
+  chain: arcTestnet,
+  transport: http(rpcUrl),
+})
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-// Circle transaction terminal states (from onchain-wait)
-const TERMINAL_STATES = new Set(['COMPLETE', 'FAILED', 'DENIED', 'CANCELLED'])
-const POLL_INTERVAL_MS = 2_000
-const POLL_TIMEOUT_MS  = 120_000
+const ORACLE_DECIMALS = 8n
+const ORACLE_SCALE    = 10n ** ORACLE_DECIMALS
 
-// Oracle params
-const ORACLE_DECIMALS   = 8n
-const ORACLE_SCALE      = 10n ** ORACLE_DECIMALS
+// Cycle: fetch price every 30 seconds
+const CYCLE_INTERVAL_MS  = 30_000
+// Deviation gate: only publish if price moved >= 0.2% (20 bps)
+const DEVIATION_GATE_BPS = 20n
+// Heartbeat: force publish if no update for 1 hour regardless of deviation
+const HEARTBEAT_SECS     = 3600
+// Quorum: minimum live sources required per leg before aggregation
+const USDC_USD_QUORUM    = 2   // out of 5 sources
+const NGN_USDT_QUORUM    = 2   // out of 4 sources
 
-// Deviation threshold (bps) -- skip submit if price moved less than this
-// (this is refreshed from on-chain each cycle)
-let cachedDeviationThresholdBps = 50n  // default 0.5%
-let cachedMaxStaleness          = 3600  // seconds, default 1 hour
-let heartbeatInterval           = 1800  // seconds, updated from on-chain
-
-// FX cache: USD/NGN is expensive to poll frequently on free plans
-let fxCache: { valueNgn: number; fetchedAt: number } | null = null
-const FX_CACHE_TTL_MS   = 60 * 60 * 1000  // 1 hour
-const FX_RETRY_DELAY_MS = 5  * 60 * 1000  // 5 min retry throttle after failure
-let fxLastFailAt        = 0
-
-// Reporter state
-let lastSubmittedAt   = 0      // unix seconds
-let lastOnChainRoundId = 0n
-let lastOnChainPrice   = 0n
+// Circle transaction polling
+const POLL_INTERVAL_MS   = 2_000
+const POLL_TIMEOUT_MS    = 120_000
+const TERMINAL_STATES    = new Set(['COMPLETE', 'FAILED', 'DENIED', 'CANCELLED'])
+const MAX_BACKOFF_MS     = 5 * 60_000
 
 // ---------------------------------------------------------------------------
-// Oracle contract ABI (minimal -- only what the reporter needs)
+// Minimal oracle ABI (only what the reporter needs)
 // ---------------------------------------------------------------------------
 
 const ORACLE_ABI = [
   {
-    type: 'function',
-    name: 'transmit',
-    inputs: [
+    type: 'function', name: 'transmit',
+    inputs: [{ name: 'answer', type: 'int256' }, { name: 'timestamp', type: 'uint256' }],
+    outputs: [], stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function', name: 'latestRound',
+    inputs: [], outputs: [{ name: '', type: 'uint256' }], stateMutability: 'view',
+  },
+  {
+    type: 'function', name: 'latestAnswer',
+    inputs: [], outputs: [{ name: '', type: 'int256' }], stateMutability: 'view',
+  },
+  {
+    type: 'function', name: 'latestRoundData',
+    inputs: [],
+    outputs: [
+      { name: 'roundId', type: 'uint80' },
       { name: 'answer', type: 'int256' },
-      { name: 'timestamp', type: 'uint256' },
+      { name: 'startedAt', type: 'uint256' },
+      { name: 'updatedAt', type: 'uint256' },
+      { name: 'answeredInRound', type: 'uint80' },
     ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'latestRound',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
     stateMutability: 'view',
   },
   {
-    type: 'function',
-    name: 'latestAnswer',
-    inputs: [],
-    outputs: [{ name: '', type: 'int256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'maxStaleness',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'deviationThresholdBps',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'circuitBreakerTripped',
-    inputs: [],
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'view',
+    type: 'function', name: 'circuitBreakerTripped',
+    inputs: [], outputs: [{ name: '', type: 'bool' }], stateMutability: 'view',
   },
 ] as const
+
+// ---------------------------------------------------------------------------
+// Reporter state
+// ---------------------------------------------------------------------------
+
+// The timestamp (unix seconds) of the last successful on-chain publish
+let lastPublishedAt  = 0
+// The on-chain price at the time of the last successful publish
+let lastPublishedPrice: bigint = 0n
+// The most recently derived price (updated every 30s cycle even if not published)
+let latestDerivedPrice: bigint = 0n
+// Whether the first round has been published yet
+let firstRoundDone = false
 
 // ---------------------------------------------------------------------------
 // Circle transaction polling
 // ---------------------------------------------------------------------------
 
-async function waitForCircleTx(transactionId: string): Promise<'COMPLETE' | 'FAILED' | 'DENIED' | 'CANCELLED'> {
+async function waitForCircleTx(
+  txId: string
+): Promise<'COMPLETE' | 'FAILED' | 'DENIED' | 'CANCELLED'> {
   const deadline = Date.now() + POLL_TIMEOUT_MS
   while (Date.now() < deadline) {
     await sleep(POLL_INTERVAL_MS)
-    let txRes
     try {
-      txRes = await circleClient.getTransaction({ id: transactionId })
+      const res = await circleClient.getTransaction({ id: txId })
+      const state = res.data?.transaction?.state ?? ''
+      if (TERMINAL_STATES.has(state)) {
+        return state as 'COMPLETE' | 'FAILED' | 'DENIED' | 'CANCELLED'
+      }
+      console.log(`  [poll] tx ${txId.slice(0, 8)}... state: ${state}`)
     } catch (e) {
-      console.warn(`[poll] getTransaction error: ${safeMsg(e)}`)
-      continue
+      console.warn(`  [poll] getTransaction error: ${safeMsg(e)}`)
     }
-    const state = txRes.data?.transaction?.state ?? ''
-    if (TERMINAL_STATES.has(state)) {
-      return state as 'COMPLETE' | 'FAILED' | 'DENIED' | 'CANCELLED'
-    }
-    console.log(`[poll] tx ${transactionId} state: ${state}`)
   }
-  throw new Error(`Transaction ${transactionId} did not reach terminal state within ${POLL_TIMEOUT_MS / 1000}s`)
+  throw new Error(`Circle tx ${txId} did not reach terminal state within ${POLL_TIMEOUT_MS / 1000}s`)
 }
 
 // ---------------------------------------------------------------------------
 // Price derivation
 // ---------------------------------------------------------------------------
 
-async function fetchUsdNgnWithCache(): Promise<SourceResult[]> {
+async function derivePrice(): Promise<bigint> {
   const now = Date.now()
 
-  // Return cached value if still fresh
-  if (fxCache && (now - fxCache.fetchedAt) < FX_CACHE_TTL_MS) {
-    return [{ value: fxCache.valueNgn, source: 'fx-cache', fetchedAt: fxCache.fetchedAt }]
-  }
-
-  // Throttle retries after recent failure
-  if (fxLastFailAt > 0 && (now - fxLastFailAt) < FX_RETRY_DELAY_MS) {
-    if (fxCache) {
-      console.warn('[fx] Using stale FX cache (retry throttled)')
-      return [{ value: fxCache.valueNgn, source: 'fx-stale-cache', fetchedAt: fxCache.fetchedAt }]
-    }
-    throw new Error('FX sources unavailable and no cached value exists')
-  }
-
-  const { successes, failures } = await fetchAll([
-    () => fetchUsdNgnExchangeRateApi(EXCHANGE_RATE_API_KEY),
-    () => fetchUsdNgnOpenExchangeRates(OPEN_EXCHANGE_RATES_ID),
+  // Fetch both legs simultaneously -- all 9 sources in parallel
+  const [usdcResult, ngnResult] = await Promise.all([
+    fetchAll([
+      () => fetchUsdcUsdCoinbase(),
+      () => fetchUsdcUsdBinance(),
+      () => fetchUsdcUsdOKX(),
+      () => fetchUsdcUsdBitget(),
+      () => fetchUsdcUsdBybit(),
+    ]),
+    fetchAll([
+      () => fetchNgnUsdtBinanceP2P(),
+      () => fetchNgnUsdtQuidax(),
+      () => fetchNgnUsdtBybitP2P(),
+      () => fetchNgnUsdtBitgetP2P(),
+    ]),
   ])
 
-  for (const f of failures) console.warn(`[fx] Source failed: ${f.error}`)
+  // Log source results
+  for (const f of usdcResult.failures) console.warn(`[usdc/usd] failed: ${f.error}`)
+  for (const f of ngnResult.failures)  console.warn(`[ngn/usdt] failed: ${f.error}`)
+  console.log(`[sources] USDC/USD: ${usdcResult.successes.length}/5 ok | NGN/USDT: ${ngnResult.successes.length}/4 ok`)
 
-  if (successes.length === 0) {
-    fxLastFailAt = now
-    if (fxCache) {
-      console.warn('[fx] All FX sources failed -- using stale cache')
-      return [{ value: fxCache.valueNgn, source: 'fx-stale-cache', fetchedAt: fxCache.fetchedAt }]
-    }
-    throw new Error('All FX sources failed and no cache available')
+  // Enforce quorum before outlier rejection
+  if (usdcResult.successes.length < USDC_USD_QUORUM) {
+    throw new Error(
+      `USDC/USD quorum not met: ${usdcResult.successes.length} sources (need ${USDC_USD_QUORUM})`
+    )
+  }
+  if (ngnResult.successes.length < NGN_USDT_QUORUM) {
+    throw new Error(
+      `NGN/USDT quorum not met: ${ngnResult.successes.length} sources (need ${NGN_USDT_QUORUM})`
+    )
   }
 
-  const med = median(successes.map((r) => r.value))
-  fxCache = { valueNgn: med, fetchedAt: now }
-  fxLastFailAt = 0
-  return successes
-}
+  // Reject outliers (10% deviation threshold, per spec)
+  const cleanUsdc = rejectOutliers(usdcResult.successes, 0.10)
+  const cleanNgn  = rejectOutliers(ngnResult.successes,  0.10)
 
-async function derivePrice(): Promise<bigint> {
-  // Fetch USDC/USD from CEX sources
-  const { successes: usdcUsdResults, failures: usdcUsdFailures } = await fetchAll([
-    () => fetchUsdcUsdBinance(),
-    () => fetchUsdcUsdCoinbase(),
-    () => fetchUsdcUsdKraken(),
-  ])
-
-  for (const f of usdcUsdFailures) console.warn(`[usdc/usd] Source failed: ${f.error}`)
-
-  if (usdcUsdResults.length < 2) {
-    throw new Error(`Insufficient USDC/USD sources: only ${usdcUsdResults.length} responded (need 2)`)
+  if (cleanUsdc.length === 0) throw new Error('All USDC/USD values rejected as outliers')
+  if (cleanNgn.length === 0)  throw new Error('All NGN/USDT values rejected as outliers')
+  if (cleanUsdc.length < USDC_USD_QUORUM) {
+    throw new Error(`Post-outlier USDC/USD quorum not met: ${cleanUsdc.length} sources`)
+  }
+  if (cleanNgn.length < NGN_USDT_QUORUM) {
+    throw new Error(`Post-outlier NGN/USDT quorum not met: ${cleanNgn.length} sources`)
   }
 
-  // Fetch USD/NGN from FX sources (cached)
-  const usdNgnResults = await fetchUsdNgnWithCache()
+  // Take the median of each leg
+  const usdcUsd = median(cleanUsdc.map((r) => r.value))  // e.g. 0.9997
+  const ngnUsdt = median(cleanNgn.map((r) => r.value))   // e.g. 1625.00
 
-  if (usdNgnResults.length < 1) {
-    throw new Error('No USD/NGN sources available')
-  }
+  // USDC/NGN = USDC/USD * NGN/USDT
+  // (NGN/USDT is treated as NGN/USD since USDT ~= USD in P2P markets)
+  // Use BigInt arithmetic -- no floating-point multiplication
+  const usdcUsdBig = floatToBigInt(usdcUsd, 12)  // 12 decimal precision
+  const ngnUsdtBig = floatToBigInt(ngnUsdt, 12)
+  // price (8 dec) = (usdcUsd * ngnUsdt * 1e8) / (1e12 * 1e12) * 1e12
+  //              = (usdcUsdBig * ngnUsdtBig) / 1e(12+12-8) = / 1e16
+  const priceBig = (usdcUsdBig * ngnUsdtBig) / (10n ** 16n)
 
-  // Reject outliers on each leg independently
-  const cleanUsdcUsd = rejectOutliers(usdcUsdResults)
-  const cleanUsdNgn  = rejectOutliers(usdNgnResults)
-
-  if (cleanUsdcUsd.length === 0) throw new Error('All USDC/USD values rejected as outliers')
-  if (cleanUsdNgn.length === 0)  throw new Error('All USD/NGN values rejected as outliers')
-
-  const usdcUsd = median(cleanUsdcUsd.map((r) => r.value))  // e.g. 0.9997
-  const usdNgn  = median(cleanUsdNgn.map((r) => r.value))   // e.g. 1620.50
-
-  // Compute USDC/NGN using integer arithmetic only (no floating-point)
-  // price (8 dec) = round(usdcUsd * usdNgn * 1e8)
-  // Use string-based approach to avoid float precision loss:
-  //   usdcUsd and usdNgn are JS numbers from JSON APIs -- convert to BigInt via
-  //   string rounding to avoid accumulating floating-point error.
-  const usdcUsdBig = floatToBigInt(usdcUsd, 10)  // 10 dec precision
-  const usdNgnBig  = floatToBigInt(usdNgn,  10)
-  // price = (usdcUsdBig * usdNgnBig) / 1e(10+10-8) = / 1e12
-  const priceBig = (usdcUsdBig * usdNgnBig) / (10n ** 12n)
-
-  console.log(`[price] USDC/USD=${usdcUsd.toFixed(6)}  USD/NGN=${usdNgn.toFixed(4)}  USDC/NGN=${formatPrice(priceBig)}`)
+  const elapsed = ((Date.now() - now) / 1000).toFixed(1)
+  console.log(
+    `[price] USDC/USD=${usdcUsd.toFixed(6)} | NGN/USDT=${ngnUsdt.toFixed(2)} | ` +
+    `USDC/NGN=${formatPrice(priceBig)} | sources(${cleanUsdc.length}+${cleanNgn.length}) | ${elapsed}s`
+  )
 
   if (priceBig <= 0n) throw new Error('Derived price is zero or negative')
   return priceBig
 }
 
-/** Convert a JS float to BigInt with `decimals` fixed-point precision, string-rounded */
+/** Convert JS float to BigInt with fixed-point precision */
 function floatToBigInt(value: number, decimals: number): bigint {
-  // Multiply, round to nearest integer, convert to BigInt
-  const shifted = value * 10 ** decimals
-  const rounded = Math.round(shifted)
-  return BigInt(rounded)
+  const shifted = Math.round(value * 10 ** decimals)
+  return BigInt(shifted)
 }
 
-/** Format a price BigInt (8 dec) for logging */
+/** Format a price BigInt (8 dec) for display */
 function formatPrice(p: bigint): string {
   const whole = p / ORACLE_SCALE
-  const frac  = p % ORACLE_SCALE
-  return `${whole}.${frac.toString().padStart(8, '0')} NGN/USDC`
+  const frac  = (p % ORACLE_SCALE).toString().padStart(8, '0')
+  return `${whole}.${frac} NGN`
 }
 
 // ---------------------------------------------------------------------------
-// On-chain state reads
+// On-chain state
 // ---------------------------------------------------------------------------
 
 async function refreshOnChainState(): Promise<void> {
-  const [roundId, price, maxStaleness, deviationBps, cbTripped, block] = await Promise.all([
-    publicClient.readContract({ address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'latestRound' })
-      .catch((e: unknown) => { throw new Error(`latestRound failed: ${safeMsg(e)}`) }),
-    publicClient.readContract({ address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'latestAnswer' })
-      .catch((): bigint => 0n),
-    publicClient.readContract({ address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'maxStaleness' })
-      .catch((): bigint => BigInt(cachedMaxStaleness)),
-    publicClient.readContract({ address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'deviationThresholdBps' })
-      .catch((): bigint => cachedDeviationThresholdBps),
-    publicClient.readContract({ address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'circuitBreakerTripped' })
-      .catch((): boolean => false),
-    publicClient.getBlock().catch((e: unknown) => { throw new Error(`getBlock failed: ${safeMsg(e)}`) }),
-  ])
+  // Check circuit breaker first
+  const cbTripped = await publicClient.readContract({
+    address: CONTRACT_ADDRESS,
+    abi: ORACLE_ABI,
+    functionName: 'circuitBreakerTripped',
+  }).catch((e: unknown): boolean => {
+    throw new Error(`circuitBreakerTripped read failed: ${safeMsg(e)}`)
+  })
 
   if (cbTripped) {
-    throw new Error('[ALERT] Circuit breaker is tripped. Owner must call resetCircuitBreaker() before reporter can continue.')
+    console.error('\n[BEACON ALERT] ====================================================')
+    console.error('[BEACON ALERT] CIRCUIT BREAKER IS TRIPPED.')
+    console.error('[BEACON ALERT] A submitted price exceeded the on-chain safety threshold.')
+    console.error('[BEACON ALERT] The contract is now frozen.')
+    console.error('[BEACON ALERT]')
+    console.error('[BEACON ALERT] To recover, the oracle owner must call ONE of:')
+    console.error('[BEACON ALERT]   resetCircuitBreaker()                      -- resets only, does not publish')
+    console.error('[BEACON ALERT]   resetCircuitBreakerAndPublish(price, ts)   -- resets AND accepts the large move')
+    console.error('[BEACON ALERT]')
+    console.error('[BEACON ALERT] After reset, restart this reporter process.')
+    console.error('[BEACON ALERT] ====================================================\n')
+    process.exit(1)
   }
 
-  lastOnChainRoundId = roundId
-  lastOnChainPrice   = typeof price === 'bigint' ? price : 0n
+  // Read latest on-chain price and round
+  try {
+    const [roundId, price] = await Promise.all([
+      publicClient.readContract({ address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'latestRound' }),
+      publicClient.readContract({ address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'latestAnswer' })
+        .catch((): bigint => 0n),
+    ])
+    lastPublishedPrice = typeof price === 'bigint' ? (price > 0n ? price : 0n) : 0n
+    firstRoundDone     = roundId > 0n
+  } catch (e) {
+    throw new Error(`On-chain state read failed: ${safeMsg(e)}`)
+  }
+}
 
-  cachedMaxStaleness          = Number(maxStaleness)
-  cachedDeviationThresholdBps = deviationBps
-  // Heartbeat must be at most half of maxStaleness so price never goes stale
-  heartbeatInterval = Math.min(1800, Math.floor(cachedMaxStaleness / 2))
+// ---------------------------------------------------------------------------
+// Submit decision (Chainlink-style rules)
+// ---------------------------------------------------------------------------
 
-  // Clamp reference timestamp to latest on-chain block (FINDING 7)
-  const blockTs = Number(block.timestamp)
-  if (blockTs > lastSubmittedAt) lastSubmittedAt = blockTs - heartbeatInterval - 1
+type SubmitDecision =
+  | { submit: true;  reason: 'first-round' | 'deviation' | 'heartbeat' }
+  | { submit: false; reason: 'within-deviation' }
+
+function shouldSubmit(newPrice: bigint, nowSecs: number): SubmitDecision {
+  // Rule 1: always submit the first round
+  if (!firstRoundDone || lastPublishedPrice === 0n) {
+    return { submit: true, reason: 'first-round' }
+  }
+
+  // Calculate deviation from last published price
+  const absDiff = newPrice > lastPublishedPrice
+    ? newPrice - lastPublishedPrice
+    : lastPublishedPrice - newPrice
+  const deviationBps = (absDiff * 10_000n) / lastPublishedPrice
+
+  // Rule 3: heartbeat -- publish if no update for >= 1 hour, using latest derived price
+  const secondsSincePublish = nowSecs - lastPublishedAt
+  if (secondsSincePublish >= HEARTBEAT_SECS) {
+    console.log(
+      `[decision] Heartbeat triggered: ${secondsSincePublish}s since last publish (threshold ${HEARTBEAT_SECS}s). ` +
+      `Deviation ${deviationBps}bps. Publishing latest 30s derived price.`
+    )
+    return { submit: true, reason: 'heartbeat' }
+  }
+
+  // Rule 2: deviation gate -- only publish if price moved >= 0.2% (20 bps)
+  if (deviationBps >= DEVIATION_GATE_BPS) {
+    console.log(`[decision] Deviation ${deviationBps}bps >= gate ${DEVIATION_GATE_BPS}bps. Submitting.`)
+    return { submit: true, reason: 'deviation' }
+  }
+
+  console.log(
+    `[decision] Skip: deviation ${deviationBps}bps < gate ${DEVIATION_GATE_BPS}bps | ` +
+    `${secondsSincePublish}s / ${HEARTBEAT_SECS}s until heartbeat`
+  )
+  return { submit: false, reason: 'within-deviation' }
 }
 
 // ---------------------------------------------------------------------------
@@ -334,120 +370,105 @@ async function refreshOnChainState(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function transmitPrice(price: bigint, timestamp: bigint): Promise<void> {
-  // Use abiFunctionSignature + abiParameters -- Circle validates the call
-  console.log(`[transmit] Submitting round via Circle wallet ${REPORTER_WALLET_ID}...`)
+  console.log(`[transmit] Submitting via Circle wallet ${REPORTER_WALLET_ID}...`)
 
   let txId: string
   try {
-    const execRes = await circleClient.createContractExecutionTransaction({
+    const res = await circleClient.createContractExecutionTransaction({
       walletId: REPORTER_WALLET_ID,
       contractAddress: CONTRACT_ADDRESS,
       abiFunctionSignature: 'transmit(int256,uint256)',
       abiParameters: [price.toString(), timestamp.toString()],
-      fee: {
-        type: 'level',
-        config: { feeLevel: 'MEDIUM' },
-      },
+      fee: { type: 'level', config: { feeLevel: 'MEDIUM' } },
     })
-
-    txId = execRes.data?.id ?? ''
+    txId = res.data?.id ?? ''
     if (!txId) throw new Error('Circle returned no transaction ID')
   } catch (e) {
     throw new Error(`createContractExecutionTransaction failed: ${safeMsg(e)}`)
   }
 
-  console.log(`[transmit] Circle tx submitted: ${txId} -- waiting for confirmation...`)
+  console.log(`[transmit] Circle tx created: ${txId.slice(0, 8)}... Waiting for on-chain confirmation...`)
 
   const finalState = await waitForCircleTx(txId)
 
   if (finalState !== 'COMPLETE') {
-    throw new Error(`Transmit transaction ended in state ${finalState} (txId: ${txId})`)
+    throw new Error(`Transmit tx ended in state ${finalState} (txId: ${txId})`)
   }
 
-  console.log(`[transmit] COMPLETE. Round ${lastOnChainRoundId + 1n} published. Price: ${formatPrice(price)}`)
-  lastSubmittedAt = Number(timestamp)
+  // Only update local state after confirmed on-chain
+  lastPublishedAt    = Number(timestamp)
+  lastPublishedPrice = price
+
+  console.log(`[transmit] CONFIRMED. Price: ${formatPrice(price)} | Timestamp: ${new Date(Number(timestamp) * 1000).toISOString()}`)
 }
 
 // ---------------------------------------------------------------------------
-// Main reporter cycle
+// Main reporter cycle (runs every 30 seconds)
 // ---------------------------------------------------------------------------
 
 async function runCycle(): Promise<void> {
-  const now = Math.floor(Date.now() / 1000)
+  const nowMs   = Date.now()
+  const nowSecs = Math.floor(nowMs / 1000)
 
-  console.log(`\n[cycle] Starting cycle at ${new Date().toISOString()}`)
+  console.log(`\n[cycle] ${new Date(nowMs).toISOString()} ------`)
 
-  // Refresh on-chain state (also checks circuit breaker -- throws if tripped)
+  // Step 1: read on-chain state (checks circuit breaker -- exits if tripped)
   await refreshOnChainState()
 
-  // Derive current price from sources
+  // Step 2: derive price from all sources
   const newPrice = await derivePrice()
 
-  // Check deviation vs last on-chain price
-  const secondsSinceSubmit = now - lastSubmittedAt
-  const heartbeatDue = secondsSinceSubmit >= heartbeatInterval
+  // Always track the latest derived price (used by heartbeat)
+  latestDerivedPrice = newPrice
 
-  if (lastOnChainPrice > 0n) {
-    const absDiff = newPrice > lastOnChainPrice ? newPrice - lastOnChainPrice : lastOnChainPrice - newPrice
-    const deviationBps = (absDiff * 10_000n) / lastOnChainPrice
+  // Step 3: decide whether to submit
+  const decision = shouldSubmit(newPrice, nowSecs)
+  if (!decision.submit) return
 
-    if (!heartbeatDue && deviationBps < cachedDeviationThresholdBps) {
-      console.log(`[cycle] Skip: deviation ${deviationBps}bps < threshold ${cachedDeviationThresholdBps}bps, heartbeat not due (${secondsSinceSubmit}s / ${heartbeatInterval}s)`)
-      return
-    }
-
-    const reason = heartbeatDue
-      ? `heartbeat due (${secondsSinceSubmit}s >= ${heartbeatInterval}s)`
-      : `deviation ${deviationBps}bps >= threshold ${cachedDeviationThresholdBps}bps`
-    console.log(`[cycle] Submit reason: ${reason}`)
-  } else {
-    console.log('[cycle] No prior on-chain price -- submitting first round')
-  }
-
-  // Clamp timestamp to current block time (never use local clock directly)
+  // Step 4: clamp timestamp to latest block (never use local clock directly)
   const block = await publicClient.getBlock()
   const timestamp = block.timestamp  // bigint, unix seconds
 
+  // Step 5: transmit
   await transmitPrice(newPrice, timestamp)
 }
 
 // ---------------------------------------------------------------------------
-// Loop
+// Strictly serialized loop (no setInterval -- one cycle at a time)
 // ---------------------------------------------------------------------------
 
-const CYCLE_INTERVAL_MS = 60_000  // check every 60 seconds
-const MAX_BACKOFF_MS    = 5 * 60_000
-
-async function loop(backoff = 0): Promise<void> {
+async function loop(backoffMs = 0): Promise<void> {
   try {
     await runCycle()
-    backoff = 0  // reset on success
+    backoffMs = 0  // reset backoff on success
   } catch (e) {
     const msg = safeMsg(e)
-    if (msg.includes('Circuit breaker')) {
-      console.error(`\n[BEACON ALERT] ${msg}`)
-      console.error('[BEACON ALERT] Reporter is pausing. Resolve on-chain then restart.\n')
-      process.exit(1)
-    }
-    const nextBackoff = Math.min(backoff > 0 ? backoff * 2 : CYCLE_INTERVAL_MS, MAX_BACKOFF_MS)
-    console.error(`[cycle] Error: ${msg}. Retrying in ${nextBackoff / 1000}s`)
-    backoff = nextBackoff
+    // Circuit breaker exits the process (see refreshOnChainState)
+    // Any other error: backoff and retry
+    const next = Math.min(backoffMs > 0 ? backoffMs * 2 : CYCLE_INTERVAL_MS, MAX_BACKOFF_MS)
+    const jitter = Math.floor(Math.random() * 3_000)
+    console.error(`[cycle] Error: ${msg}`)
+    console.error(`[cycle] Retrying in ${(next + jitter) / 1000}s`)
+    backoffMs = next + jitter
   }
 
-  // Schedule next cycle -- strictly serialized (no overlap)
-  const delay = backoff > 0 ? backoff : CYCLE_INTERVAL_MS
-  setTimeout((): void => { void loop(backoff) }, delay)
+  // Schedule next cycle strictly after this one finishes
+  const delay = backoffMs > 0 ? backoffMs : CYCLE_INTERVAL_MS
+  setTimeout((): void => { void loop(backoffMs) }, delay)
 }
 
 // ---------------------------------------------------------------------------
 // Entry
 // ---------------------------------------------------------------------------
 
-console.log('[BEACON] Reporter starting (Circle developer-controlled wallet mode)')
-console.log(`[BEACON] Contract:        ${CONTRACT_ADDRESS}`)
-console.log(`[BEACON] Reporter wallet: ${REPORTER_WALLET_ID}`)
-console.log(`[BEACON] RPC endpoint:    ${rpcUrl.replace(/\?.*/, '?...')}`)
-console.log(`[BEACON] Cycle interval:  ${CYCLE_INTERVAL_MS / 1000}s`)
+console.log('[BEACON] Reporter starting')
+console.log(`[BEACON] Contract:         ${CONTRACT_ADDRESS}`)
+console.log(`[BEACON] Reporter wallet:  ${REPORTER_WALLET_ID}`)
+console.log(`[BEACON] Cycle:            every ${CYCLE_INTERVAL_MS / 1000}s`)
+console.log(`[BEACON] Deviation gate:   ${DEVIATION_GATE_BPS}bps (${Number(DEVIATION_GATE_BPS) / 100}%)`)
+console.log(`[BEACON] Heartbeat:        ${HEARTBEAT_SECS}s (${HEARTBEAT_SECS / 3600}h)`)
+console.log(`[BEACON] Quorum:           USDC/USD ${USDC_USD_QUORUM}/5 | NGN/USDT ${NGN_USDT_QUORUM}/4`)
+console.log(`[BEACON] Outlier filter:   10% max deviation from group median`)
 console.log('')
 
 void loop()
@@ -460,11 +481,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-/** Extract a safe error message that never includes URLs (no API key leakage) */
+/** Extract a safe error message -- never includes URLs (no API key leakage) */
 function safeMsg(e: unknown): string {
   const raw = e instanceof Error ? e.message : String(e)
-  // Strip anything that looks like a URL to prevent leaking API keys in logs
-  return raw.replace(/https?:\/\/[^\s"']*/g, '[url-redacted]').slice(0, 300)
+  return raw.replace(/https?:\/\/[^\s"']*/g, '[url-redacted]').slice(0, 400)
 }
 
-
+// Suppress unused variable warning for latestDerivedPrice
+// (it is tracked for future use in a status endpoint)
+void latestDerivedPrice
