@@ -132,18 +132,18 @@ const ORACLE_ABI = [
     inputs: [], outputs: [{ name: '', type: 'uint256' }], stateMutability: 'view',
   },
   {
-    type: 'function', name: 'latestAnswer',
-    inputs: [], outputs: [{ name: '', type: 'int256' }], stateMutability: 'view',
-  },
-  {
-    type: 'function', name: 'latestRoundData',
-    inputs: [],
+    // Issue 2 + 4 fix: use getRoundData instead of latestAnswer/latestRoundData.
+    // getRoundData does NOT enforce the staleness check, so it never reverts when
+    // the feed is stale. This means lastPublishedPrice and lastPublishedAt are
+    // always restored correctly on process restart -- no silent reset to 0 / 0n.
+    type: 'function', name: 'getRoundData',
+    inputs: [{ name: '_roundId', type: 'uint80' }],
     outputs: [
-      { name: 'roundId', type: 'uint80' },
-      { name: 'answer', type: 'int256' },
-      { name: 'startedAt', type: 'uint256' },
-      { name: 'updatedAt', type: 'uint256' },
-      { name: 'answeredInRound', type: 'uint80' },
+      { name: 'roundId',        type: 'uint80'  },
+      { name: 'answer',         type: 'int256'  },
+      { name: 'startedAt',      type: 'uint256' },
+      { name: 'updatedAt',      type: 'uint256' },
+      { name: 'answeredInRound',type: 'uint80'  },
     ],
     stateMutability: 'view',
   },
@@ -267,10 +267,30 @@ async function derivePrice(): Promise<bigint> {
   return priceBig
 }
 
-/** Convert JS float to BigInt with fixed-point precision */
+/**
+ * Convert a JS float to a BigInt with exactly `decimals` decimal places.
+ *
+ * Issue 1 fix: never use Math.round(value * 10**decimals) -- for large decimal
+ * counts (e.g. 12) the multiplication produces a float that has already lost
+ * sub-unit precision before Math.round sees it. Instead we work entirely in
+ * string arithmetic: split on the decimal point, pad/truncate the fractional
+ * part to exactly `decimals` digits, then concatenate and parse as BigInt.
+ *
+ * Examples:
+ *   floatToBigInt(1624.73, 12) => 1624730000000000n  (exact, no float rounding)
+ *   floatToBigInt(0.9997,  12) =>    999700000000n
+ */
 function floatToBigInt(value: number, decimals: number): bigint {
-  const shifted = Math.round(value * 10 ** decimals)
-  return BigInt(shifted)
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`floatToBigInt: invalid value ${value}`)
+  }
+  // Convert to a string with enough significant digits to cover `decimals` places.
+  // toFixed(decimals) handles rounding at the string level, not the float level.
+  const fixed = value.toFixed(decimals)
+  const [whole, frac = ''] = fixed.split('.')
+  // frac is already exactly `decimals` digits long from toFixed
+  const combined = whole + frac.padEnd(decimals, '0').slice(0, decimals)
+  return BigInt(combined)
 }
 
 /** Format a price BigInt (8 dec) for display */
@@ -285,7 +305,7 @@ function formatPrice(p: bigint): string {
 // ---------------------------------------------------------------------------
 
 async function refreshOnChainState(): Promise<void> {
-  // Check circuit breaker first
+  // Step 1: check circuit breaker -- exit immediately if tripped
   const cbTripped = await publicClient.readContract({
     address: CONTRACT_ADDRESS,
     abi: ORACLE_ABI,
@@ -309,15 +329,40 @@ async function refreshOnChainState(): Promise<void> {
     process.exit(1)
   }
 
-  // Read latest on-chain price and round
+  // Step 2: read the latest round id
+  // Issue 2 + 4 fix: read latestRound() to get the id, then call getRoundData(id)
+  // which does NOT enforce staleness. This means:
+  //   - lastPublishedPrice is always restored correctly even if the feed is stale
+  //   - lastPublishedAt is initialized from on-chain updatedAt on every startup,
+  //     so the heartbeat timer is never incorrectly reset to epoch 0
   try {
-    const [roundId, price] = await Promise.all([
-      publicClient.readContract({ address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'latestRound' }),
-      publicClient.readContract({ address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'latestAnswer' })
-        .catch((): bigint => 0n),
-    ])
-    lastPublishedPrice = typeof price === 'bigint' ? (price > 0n ? price : 0n) : 0n
-    firstRoundDone     = roundId > 0n
+    const roundId = await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: ORACLE_ABI,
+      functionName: 'latestRound',
+    })
+
+    firstRoundDone = roundId > 0n
+
+    if (firstRoundDone) {
+      // getRoundData never enforces staleness -- safe to call even on a stale feed
+      const roundData = await publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: ORACLE_ABI,
+        functionName: 'getRoundData',
+        args: [roundId],
+      }) as [bigint, bigint, bigint, bigint, bigint]
+      // roundData: [roundId, answer, startedAt, updatedAt, answeredInRound]
+      const [, answer, , updatedAt] = roundData
+      lastPublishedPrice = answer > 0n ? answer : 0n
+      // Initialize lastPublishedAt from on-chain updatedAt so the heartbeat
+      // timer counts from the actual last publish, not from process startup.
+      // Only overwrite if this is the first read this session (lastPublishedAt == 0).
+      if (lastPublishedAt === 0) {
+        lastPublishedAt = Number(updatedAt)
+        console.log(`[state] Restored lastPublishedAt from chain: ${new Date(lastPublishedAt * 1000).toISOString()}`)
+      }
+    }
   } catch (e) {
     throw new Error(`On-chain state read failed: ${safeMsg(e)}`)
   }

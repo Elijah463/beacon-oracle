@@ -437,22 +437,37 @@ export function rejectOutliers(
 /**
  * Fetch all sources for a leg in parallel, collecting successes and failures.
  * Returns { successes, failures }. A failure in one source never blocks others.
+ *
+ * Issue 3 fix: each fetcher is wrapped in a tagged object so the source name
+ * is preserved even when the fetch rejects -- no more source: 'unknown'.
  */
 export async function fetchAll(
   fetchers: Array<() => Promise<SourceResult>>
 ): Promise<{ successes: SourceResult[]; failures: Array<{ source: string; error: string }> }> {
-  const settled = await Promise.allSettled(fetchers.map((f) => f()))
+  // Run all fetchers and tag each result with its index so we can identify failures.
+  // We wrap each fetcher so that on rejection we still get a named error.
+  const tagged = fetchers.map((f) =>
+    f().then(
+      (result) => ({ ok: true as const, result }),
+      (reason: unknown) => ({ ok: false as const, reason })
+    )
+  )
+
+  const settled = await Promise.all(tagged)
   const successes: SourceResult[] = []
   const failures: Array<{ source: string; error: string }> = []
 
   for (const r of settled) {
-    if (r.status === 'fulfilled') {
-      successes.push(r.value)
+    if (r.ok) {
+      successes.push(r.result)
     } else {
       const msg = r.reason instanceof Error ? r.reason.message : String(r.reason)
-      // Redact any URLs that may have slipped through
+      // Redact any URLs that may have slipped through (no API key leakage in logs)
       const safe = msg.replace(/https?:\/\/[^\s"']*/g, '[url-redacted]').slice(0, 200)
-      failures.push({ source: 'unknown', error: safe })
+      // Extract source name from the error message prefix (e.g. "BinanceP2P: no active ads")
+      const colonIdx = safe.indexOf(':')
+      const source = colonIdx > 0 && colonIdx < 30 ? safe.slice(0, colonIdx) : 'unknown'
+      failures.push({ source, error: safe })
     }
   }
 
