@@ -60,6 +60,7 @@ import {
 // Config
 // ---------------------------------------------------------------------------
 
+const BITGET_API_KEY       = process.env.BITGET_API_KEY ?? ''
 const CIRCLE_API_KEY       = process.env.CIRCLE_API_KEY ?? ''
 const CIRCLE_ENTITY_SECRET = process.env.CIRCLE_ENTITY_SECRET
   ?? process.env.ENTITY_SECRET
@@ -209,7 +210,7 @@ async function derivePrice(): Promise<bigint> {
       () => fetchNgnUsdtBinanceP2P(),
       () => fetchNgnUsdtQuidax(),
       () => fetchNgnUsdtBybitP2P(),
-      () => fetchNgnUsdtBitgetP2P(),
+      () => fetchNgnUsdtBitgetP2P(BITGET_API_KEY),
     ]),
   ])
 

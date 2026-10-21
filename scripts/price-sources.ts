@@ -315,13 +315,22 @@ export async function fetchNgnUsdtBinanceP2P(): Promise<SourceResult> {
  * Quidax: NGN/USDT last trade price.
  * Quidax is a Nigerian exchange -- its NGN/USDT spot rate directly reflects
  * local market conditions. Public ticker endpoint, no auth required.
+ * NOTE: Quidax may geo-restrict requests from non-Nigerian IPs. This source
+ * works reliably when the reporter runs on a Nigerian or West African VPS.
+ * The endpoint returns { data: { ticker: { last: "1640.00", ... } } }
  */
 export async function fetchNgnUsdtQuidax(): Promise<SourceResult> {
   await limiters['Quidax'].acquire()
-  // Quidax markets use pair notation in lowercase e.g. "usdtngn"
+  // Quidax uses lowercase pair notation: usdtngn (USDT quoted in NGN)
   const data = await fetchJson(
     'https://www.quidax.com/api/v1/markets/tickers/usdtngn',
-    'Quidax'
+    'Quidax',
+    {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      },
+    }
   ) as { data: { ticker: { last: string } } }
   const raw = data.data?.ticker?.last
   if (!raw) throw new Error('Quidax: missing ticker.last in response')
@@ -357,29 +366,28 @@ export async function fetchNgnUsdtBybitP2P(): Promise<SourceResult> {
 
 /**
  * Bitget P2P: NGN/USDT buy-side median from active sell ads.
- * Public P2P ads endpoint, no auth required.
+ * Uses the v3 public ad-list endpoint which requires an ACCESS-KEY header.
+ * Set BITGET_API_KEY in .env (free Bitget account, read-only key is sufficient).
+ * If no key is provided this source will fail gracefully and be excluded from
+ * aggregation -- the other three NGN/USDT sources maintain quorum.
  */
-export async function fetchNgnUsdtBitgetP2P(): Promise<SourceResult> {
+export async function fetchNgnUsdtBitgetP2P(apiKey: string): Promise<SourceResult> {
+  if (!apiKey) throw new Error('BitgetP2P: BITGET_API_KEY not set -- source skipped')
   await limiters['BitgetP2P'].acquire()
-  const body = JSON.stringify({
-    coinCode: 'USDT',
-    fiatCode: 'NGN',
-    tradeType: '1',   // 1 = sell (merchant sells USDT, buyer pays NGN)
-    pageSize: 10,
-    pageNo: 1,
-  })
   const data = await fetchJson(
-    'https://api.bitget.com/api/p2p/v1/merchant/advList',
+    'https://api.bitget.com/api/v3/p2p/ad-list?token=USDT&fiat=NGN&side=sell&pageNum=1&limit=10',
     'BitgetP2P',
     {
-      method: 'POST',
-      body,
-      headers: { 'Content-Type': 'application/json' },
       timeoutMs: 12_000,
+      headers: {
+        'ACCESS-KEY': apiKey,
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0',
+      },
     }
-  ) as { data: { dataList: Array<{ price: string }> } }
+  ) as { data: Array<{ price: string }> }
 
-  const list = data.data?.dataList
+  const list = data.data
   if (!list?.length) throw new Error('BitgetP2P: no active ads')
   const prices = list
     .slice(0, 5)
