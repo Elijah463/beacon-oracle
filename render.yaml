@@ -36,6 +36,16 @@ services:
       - key: VITE_ORACLE_CONTRACT_ADDRESS
         value: "0xfacb599c862322229a1861df76a7fbf26ebf9f55"
 
+      # --- Nigerian residential proxy for P2P sources ---
+      # P2P endpoints (Binance P2P, Quidax, Bybit P2P, Bitget P2P) geo-restrict
+      # requests from non-Nigerian IPs. Set this to a Nigerian residential proxy
+      # URL so the reporter can reach them from Render's US/EU servers.
+      # Format: http://user:pass@host:port
+      # Recommended free/cheap provider: Webshare.io (see GUIDE.md for setup steps)
+      # Without this, the NGN/USDT leg will likely fail quorum from non-Nigerian IPs.
+      - key: NGN_PROXY_URL
+        sync: false   # set manually in the Render dashboard
+
       # --- Optional: Bitget P2P API key (free read-only key from Bitget) ---
       # Without this, Bitget P2P is skipped gracefully. The other 3 NGN/USDT
       # sources still maintain quorum.

@@ -18,7 +18,15 @@
  *   - Outlier rejection: any source deviating >10% from the group median is invalidated
  *   - Sanity bounds: values outside hard limits are rejected before entering aggregation
  *   - Error messages never include URLs (no API key leakage in logs)
+ *
+ * PROXY SUPPORT (NGN/USDT P2P sources only):
+ *   P2P endpoints geo-restrict requests from non-Nigerian IPs. Pass a Nigerian
+ *   residential proxy URL via the `proxy` parameter on each P2P fetcher.
+ *   Set NGN_PROXY_URL in .env: http://user:pass@host:port
+ *   The USDC/USD sources (Leg A) never use a proxy -- they work from any IP.
  */
+
+import { HttpsProxyAgent } from 'https-proxy-agent'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -118,6 +126,8 @@ interface FetchOptions {
   headers?: Record<string, string>
   method?: string
   body?: string
+  /** Optional Nigerian residential proxy agent for geo-restricted P2P endpoints. */
+  agent?: HttpsProxyAgent<string>
 }
 
 async function fetchJson(
@@ -125,7 +135,7 @@ async function fetchJson(
   sourceName: string,
   opts: FetchOptions = {}
 ): Promise<unknown> {
-  const { timeoutMs = 8_000, maxRetries = 2, headers = {}, method = 'GET', body } = opts
+  const { timeoutMs = 8_000, maxRetries = 2, headers = {}, method = 'GET', body, agent } = opts
 
   let attempt = 0
   let backoffMs = 1_000
@@ -140,6 +150,10 @@ async function fetchJson(
         method,
         headers: { 'Accept': 'application/json', ...headers },
         body,
+        // Pass proxy agent when provided. HttpsProxyAgent is compatible with
+        // Node's undici Dispatcher interface at runtime. We cast through unknown
+        // to avoid the unsafe-any lint rule while keeping the type explicit.
+        ...(agent ? { dispatcher: agent as unknown as import('undici').Dispatcher } : {}),
       })
       clearTimeout(timer)
 
@@ -278,7 +292,7 @@ export async function fetchUsdcUsdBybit(): Promise<SourceResult> {
  * Scrapes the public P2P ads endpoint (no auth required).
  * Returns the median of the top-5 active SELL ads (what a buyer pays in NGN).
  */
-export async function fetchNgnUsdtBinanceP2P(): Promise<SourceResult> {
+export async function fetchNgnUsdtBinanceP2P(proxy?: HttpsProxyAgent<string>): Promise<SourceResult> {
   await limiters['BinanceP2P'].acquire()
   const body = JSON.stringify({
     asset: 'USDT',
@@ -297,6 +311,7 @@ export async function fetchNgnUsdtBinanceP2P(): Promise<SourceResult> {
       body,
       headers: { 'Content-Type': 'application/json' },
       timeoutMs: 12_000,
+      agent: proxy,
     }
   ) as { data: Array<{ adv: { price: string } }> }
 
@@ -319,7 +334,7 @@ export async function fetchNgnUsdtBinanceP2P(): Promise<SourceResult> {
  * works reliably when the reporter runs on a Nigerian or West African VPS.
  * The endpoint returns { data: { ticker: { last: "1640.00", ... } } }
  */
-export async function fetchNgnUsdtQuidax(): Promise<SourceResult> {
+export async function fetchNgnUsdtQuidax(proxy?: HttpsProxyAgent<string>): Promise<SourceResult> {
   await limiters['Quidax'].acquire()
   // Quidax uses lowercase pair notation: usdtngn (USDT quoted in NGN)
   const data = await fetchJson(
@@ -330,6 +345,7 @@ export async function fetchNgnUsdtQuidax(): Promise<SourceResult> {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'application/json',
       },
+      agent: proxy,
     }
   ) as { data: { ticker: { last: string } } }
   const raw = data.data?.ticker?.last
@@ -343,13 +359,13 @@ export async function fetchNgnUsdtQuidax(): Promise<SourceResult> {
  * Bybit P2P: NGN/USDT buy-side median from active sell ads.
  * Public P2P ads endpoint, no auth required.
  */
-export async function fetchNgnUsdtBybitP2P(): Promise<SourceResult> {
+export async function fetchNgnUsdtBybitP2P(proxy?: HttpsProxyAgent<string>): Promise<SourceResult> {
   await limiters['BybitP2P'].acquire()
   const data = await fetchJson(
     'https://api2.bybit.com/fiat/otc/item/online?' +
       'userId=&tokenId=USDT&currencyId=NGN&payment=&side=1&size=10&page=1&amount=',
     'BybitP2P',
-    { timeoutMs: 12_000 }
+    { timeoutMs: 12_000, agent: proxy }
   ) as { result: { items: Array<{ price: string }> } }
 
   const items = data.result?.items
@@ -371,7 +387,7 @@ export async function fetchNgnUsdtBybitP2P(): Promise<SourceResult> {
  * If no key is provided this source will fail gracefully and be excluded from
  * aggregation -- the other three NGN/USDT sources maintain quorum.
  */
-export async function fetchNgnUsdtBitgetP2P(apiKey: string): Promise<SourceResult> {
+export async function fetchNgnUsdtBitgetP2P(apiKey: string, proxy?: HttpsProxyAgent<string>): Promise<SourceResult> {
   if (!apiKey) throw new Error('BitgetP2P: BITGET_API_KEY not set -- source skipped')
   await limiters['BitgetP2P'].acquire()
   const data = await fetchJson(
@@ -384,6 +400,7 @@ export async function fetchNgnUsdtBitgetP2P(apiKey: string): Promise<SourceResul
         'Content-Type': 'application/json',
         'User-Agent': 'Mozilla/5.0',
       },
+      agent: proxy,
     }
   ) as { data: Array<{ price: string }> }
 

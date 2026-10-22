@@ -40,6 +40,7 @@
 import { initiateDeveloperControlledWalletsClient } from '@circle-fin/developer-controlled-wallets'
 import { createPublicClient, http } from 'viem'
 import { arcTestnet } from 'viem/chains'
+import { HttpsProxyAgent } from 'https-proxy-agent'
 
 import {
   fetchUsdcUsdCoinbase,
@@ -69,10 +70,25 @@ const CIRCLE_ENTITY_SECRET = process.env.CIRCLE_ENTITY_SECRET
 const REPORTER_WALLET_ID   = process.env.REPORTER_WALLET_ID ?? ''
 const CONTRACT_ADDRESS     = (process.env.VITE_ORACLE_CONTRACT_ADDRESS ?? '') as `0x${string}`
 
+// NGN proxy: Nigerian residential proxy URL for geo-restricted P2P endpoints.
+// Format: http://user:pass@host:port  (or socks5://user:pass@host:port)
+// Only the 4 P2P fetchers use this. USDC/USD sources never use a proxy.
+// If not set, P2P sources are attempted directly (works from Nigerian IPs).
+const NGN_PROXY_URL = process.env.NGN_PROXY_URL ?? ''
+const ngnProxy = NGN_PROXY_URL
+  ? new HttpsProxyAgent(NGN_PROXY_URL)
+  : undefined
+
 if (!CIRCLE_API_KEY)       { console.error('[BEACON] CIRCLE_API_KEY not set');       process.exit(1) }
 if (!CIRCLE_ENTITY_SECRET) { console.error('[BEACON] CIRCLE_ENTITY_SECRET not set'); process.exit(1) }
 if (!REPORTER_WALLET_ID)   { console.error('[BEACON] REPORTER_WALLET_ID not set');   process.exit(1) }
 if (!CONTRACT_ADDRESS)     { console.error('[BEACON] VITE_ORACLE_CONTRACT_ADDRESS not set'); process.exit(1) }
+
+if (NGN_PROXY_URL) {
+  console.log('[BEACON] NGN proxy: configured (Nigerian residential proxy active for P2P sources)')
+} else {
+  console.log('[BEACON] NGN proxy: not set -- P2P sources will be attempted directly')
+}
 
 // ---------------------------------------------------------------------------
 // Clients
@@ -207,10 +223,10 @@ async function derivePrice(): Promise<bigint> {
       () => fetchUsdcUsdBybit(),
     ]),
     fetchAll([
-      () => fetchNgnUsdtBinanceP2P(),
-      () => fetchNgnUsdtQuidax(),
-      () => fetchNgnUsdtBybitP2P(),
-      () => fetchNgnUsdtBitgetP2P(BITGET_API_KEY),
+      () => fetchNgnUsdtBinanceP2P(ngnProxy),
+      () => fetchNgnUsdtQuidax(ngnProxy),
+      () => fetchNgnUsdtBybitP2P(ngnProxy),
+      () => fetchNgnUsdtBitgetP2P(BITGET_API_KEY, ngnProxy),
     ]),
   ])
 
