@@ -1,0 +1,52 @@
+services:
+  # BEACON Oracle -- off-chain price reporter
+  # Background Worker: runs the 30-second price collection and on-chain
+  # submission loop indefinitely. Never sleeps. Auto-deploys on every
+  # push to the main branch of github.com/Elijah463/beacon-oracle.
+  - type: worker
+    name: beacon-reporter
+    runtime: node
+    region: oregon   # change to "frankfurt" or "singapore" if you want closer to your VPS
+    branch: main
+    buildCommand: npm install -g bun && bun install
+    startCommand: bun run scripts/reporter.ts
+    autoDeploy: true
+    plan: free
+
+    # Health: Render will restart the worker automatically if the process exits.
+    # The reporter exits on circuit breaker trip (intentional) -- Render will
+    # restart it, which is fine: the circuit breaker check runs first every cycle
+    # so it will exit immediately again until you call resetCircuitBreaker().
+
+    envVars:
+      # --- Circle developer-controlled wallet credentials ---
+      - key: CIRCLE_API_KEY
+        sync: false   # set manually in the Render dashboard -- never commit this
+
+      - key: CIRCLE_ENTITY_SECRET
+        sync: false   # set manually in the Render dashboard -- never commit this
+
+      - key: REPORTER_WALLET_ID
+        sync: false   # set after running scripts/setup-reporter-wallet.ts
+
+      - key: REPORTER_WALLET_ADDRESS
+        sync: false   # set after running scripts/setup-reporter-wallet.ts
+
+      # --- Oracle contract address ---
+      - key: VITE_ORACLE_CONTRACT_ADDRESS
+        value: "0xfacb599c862322229a1861df76a7fbf26ebf9f55"
+
+      # --- Optional: Bitget P2P API key (free read-only key from Bitget) ---
+      # Without this, Bitget P2P is skipped gracefully. The other 3 NGN/USDT
+      # sources still maintain quorum.
+      - key: BITGET_API_KEY
+        sync: false
+
+      # --- Optional: RPC proxy (Arc Studio provides this in sandbox only) ---
+      # Leave blank on Render -- the reporter falls back to the public Arc RPC.
+      - key: RPC_PROXY_BASE_URL
+        sync: false
+      - key: RPC_PROXY_TOKEN
+        sync: false
+      - key: RPC_PROXY_CHAINS
+        sync: false
