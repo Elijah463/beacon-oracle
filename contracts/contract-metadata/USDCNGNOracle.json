@@ -1,13 +1,20 @@
 {
-  "contractAddress": "0xfacb599c862322229a1861df76a7fbf26ebf9f55",
+  "contractAddress": "0x69f5716e6453e2a43910f6cfea06500056fcf5e6",
   "network": "ARC-TESTNET",
   "deployerWalletId": "3c2464b2-8369-52e2-a782-800bbeca5396",
   "contract_code_path": "/home/user/app/contracts/USDCNGNOracle.sol",
   "contract_compiled_code_path": "/home/user/app/contracts/out/USDCNGNOracle.sol/USDCNGNOracle.json",
   "contract_network_and_links": {
-    "Arc Testnet": "https://explorer.testnet.arc.io/address/0xfacb599c862322229a1861df76a7fbf26ebf9f55"
+    "Arc Testnet": "https://explorer.testnet.arc.io/address/0x69f5716e6453e2a43910f6cfea06500056fcf5e6"
   },
   "contract_deployments": [
+    {
+      "chain": "Arc Testnet",
+      "address": "0x69f5716e6453e2a43910f6cfea06500056fcf5e6",
+      "explorerUrl": "https://explorer.testnet.arc.io/address/0x69f5716e6453e2a43910f6cfea06500056fcf5e6",
+      "txHash": "0xcde68d1266b4e697e2aeb46774218c12865f7372b30a5f2ba5b3014890ccf2ea",
+      "deployedAt": "2026-10-25T20:55:27.458Z"
+    },
     {
       "chain": "Arc Testnet",
       "address": "0xfacb599c862322229a1861df76a7fbf26ebf9f55",
@@ -69,6 +76,25 @@
         }
       ],
       "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "_extractPhaseId",
+      "inputs": [
+        {
+          "name": "fullRoundId",
+          "type": "uint80",
+          "internalType": "uint80"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint16",
+          "internalType": "uint16"
+        }
+      ],
+      "stateMutability": "pure"
     },
     {
       "type": "function",
@@ -389,6 +415,19 @@
     },
     {
       "type": "function",
+      "name": "phaseId",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint16",
+          "internalType": "uint16"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
       "name": "proxiableUUID",
       "inputs": [],
       "outputs": [
@@ -600,10 +639,28 @@
           "name": "timestamp",
           "type": "uint256",
           "internalType": "uint256"
+        },
+        {
+          "name": "signature",
+          "type": "bytes",
+          "internalType": "bytes"
         }
       ],
       "outputs": [],
       "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "typeAndVersion",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "string",
+          "internalType": "string"
+        }
+      ],
+      "stateMutability": "pure"
     },
     {
       "type": "function",
@@ -861,6 +918,37 @@
     },
     {
       "type": "event",
+      "name": "NewTransmission",
+      "inputs": [
+        {
+          "name": "aggregatorRoundId",
+          "type": "uint32",
+          "indexed": true,
+          "internalType": "uint32"
+        },
+        {
+          "name": "answer",
+          "type": "int192",
+          "indexed": false,
+          "internalType": "int192"
+        },
+        {
+          "name": "transmitter",
+          "type": "address",
+          "indexed": false,
+          "internalType": "address"
+        },
+        {
+          "name": "phaseId",
+          "type": "uint16",
+          "indexed": false,
+          "internalType": "uint16"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
       "name": "OwnershipTransferStarted",
       "inputs": [
         {
@@ -1015,6 +1103,11 @@
     {
       "type": "error",
       "name": "InvalidInitialization",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "InvalidSignature",
       "inputs": []
     },
     {

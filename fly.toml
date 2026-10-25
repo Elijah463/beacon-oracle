@@ -1,0 +1,24 @@
+# fly.toml -- BEACON Oracle reporter on Fly.io
+# Deploy with: fly deploy
+# First time:  fly launch --no-deploy, then fly deploy
+
+app = "beacon-oracle-reporter"
+primary_region = "lhr"   # London -- good latency to Nigerian P2P endpoints via proxy
+
+[build]
+  # Fly.io detects the Dockerfile automatically. We use a Dockerfile so we can
+  # install Bun (Fly's built-in runtimes do not include Bun).
+
+[env]
+  # Non-secret env vars -- secrets are set via: fly secrets set KEY=value
+  VITE_ORACLE_CONTRACT_ADDRESS = "0xfacb599c862322229a1861df76a7fbf26ebf9f55"
+
+# No HTTP service -- this is a pure background worker process.
+# Fly.io will keep it running and auto-restart on crash (including circuit breaker exit).
+[[processes]]
+  name = "reporter"
+  entrypoint = ["bun", "run", "scripts/reporter.ts"]
+
+[restart]
+  policy = "always"
+  max_retries = 10

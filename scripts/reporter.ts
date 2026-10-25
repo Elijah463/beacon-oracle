@@ -38,7 +38,8 @@
  */
 
 import { initiateDeveloperControlledWalletsClient } from '@circle-fin/developer-controlled-wallets'
-import { createPublicClient, http } from 'viem'
+import { createPublicClient, http, encodePacked, keccak256 } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
 import { arcTestnet } from 'viem/chains'
 import { HttpsProxyAgent } from 'https-proxy-agent'
 
@@ -70,6 +71,14 @@ const CIRCLE_ENTITY_SECRET = process.env.CIRCLE_ENTITY_SECRET
 const REPORTER_WALLET_ID   = process.env.REPORTER_WALLET_ID ?? ''
 const CONTRACT_ADDRESS     = (process.env.VITE_ORACLE_CONTRACT_ADDRESS ?? '') as `0x${string}`
 
+// REPORTER_SIGNING_KEY: a plain hex private key used ONLY for signing the
+// transmit() payload off-chain. This key's address must be set as the
+// `reporter` on the oracle contract via setReporter().
+// The Circle developer-controlled wallet is used only for gas/tx submission.
+// This separation means: even if the Circle wallet is compromised, an attacker
+// cannot submit a forged price because they cannot produce a valid payload signature.
+const REPORTER_SIGNING_KEY = (process.env.REPORTER_SIGNING_KEY ?? '') as `0x${string}`
+
 // NGN proxy: Nigerian residential proxy URL for geo-restricted P2P endpoints.
 // Format: http://user:pass@host:port  (or socks5://user:pass@host:port)
 // Only the 4 P2P fetchers use this. USDC/USD sources never use a proxy.
@@ -79,10 +88,15 @@ const ngnProxy = NGN_PROXY_URL
   ? new HttpsProxyAgent(NGN_PROXY_URL)
   : undefined
 
-if (!CIRCLE_API_KEY)       { console.error('[BEACON] CIRCLE_API_KEY not set');       process.exit(1) }
-if (!CIRCLE_ENTITY_SECRET) { console.error('[BEACON] CIRCLE_ENTITY_SECRET not set'); process.exit(1) }
-if (!REPORTER_WALLET_ID)   { console.error('[BEACON] REPORTER_WALLET_ID not set');   process.exit(1) }
-if (!CONTRACT_ADDRESS)     { console.error('[BEACON] VITE_ORACLE_CONTRACT_ADDRESS not set'); process.exit(1) }
+if (!CIRCLE_API_KEY)        { console.error('[BEACON] CIRCLE_API_KEY not set');        process.exit(1) }
+if (!CIRCLE_ENTITY_SECRET)  { console.error('[BEACON] CIRCLE_ENTITY_SECRET not set');  process.exit(1) }
+if (!REPORTER_WALLET_ID)    { console.error('[BEACON] REPORTER_WALLET_ID not set');     process.exit(1) }
+if (!CONTRACT_ADDRESS)      { console.error('[BEACON] VITE_ORACLE_CONTRACT_ADDRESS not set'); process.exit(1) }
+if (!REPORTER_SIGNING_KEY)  { console.error('[BEACON] REPORTER_SIGNING_KEY not set');   process.exit(1) }
+
+// Build the signing account from the signing key (sign-only, never broadcasts tx)
+const signingAccount = privateKeyToAccount(REPORTER_SIGNING_KEY)
+console.log(`[BEACON] Signing address:  ${signingAccount.address} (must match setReporter() on contract)`)
 
 if (NGN_PROXY_URL) {
   console.log('[BEACON] NGN proxy: configured (Nigerian residential proxy active for P2P sources)')
@@ -139,8 +153,14 @@ const MAX_BACKOFF_MS     = 5 * 60_000
 
 const ORACLE_ABI = [
   {
+    // transmit now requires a 65-byte ECDSA signature over the payload.
+    // The signing key's address must match the `reporter` set on the contract.
     type: 'function', name: 'transmit',
-    inputs: [{ name: 'answer', type: 'int256' }, { name: 'timestamp', type: 'uint256' }],
+    inputs: [
+      { name: 'answer',    type: 'int256'  },
+      { name: 'timestamp', type: 'uint256' },
+      { name: 'signature', type: 'bytes'   },
+    ],
     outputs: [], stateMutability: 'nonpayable',
   },
   {
@@ -431,16 +451,29 @@ function shouldSubmit(newPrice: bigint, nowSecs: number): SubmitDecision {
 // Transmit via Circle developer-controlled wallet
 // ---------------------------------------------------------------------------
 
-async function transmitPrice(price: bigint, timestamp: bigint): Promise<void> {
-  console.log(`[transmit] Submitting via Circle wallet ${REPORTER_WALLET_ID}...`)
+async function transmitPrice(price: bigint, timestamp: bigint, nextRoundId: bigint): Promise<void> {
+  console.log(`[transmit] Signing payload for round ${nextRoundId}...`)
+
+  // Build the same payload hash the contract verifies:
+  // keccak256(abi.encodePacked(address(this), answer, timestamp, latestRoundIdCounter + 1))
+  const payloadHash = keccak256(
+    encodePacked(
+      ['address', 'int256',  'uint256',   'uint256'],
+      [CONTRACT_ADDRESS, price, timestamp, nextRoundId]
+    )
+  )
+  // Sign with Ethereum prefix (matches contract's "\x19Ethereum Signed Message:\n32" prefix)
+  const signature = await signingAccount.signMessage({ message: { raw: payloadHash } })
+
+  console.log(`[transmit] Payload signed. Submitting via Circle wallet ${REPORTER_WALLET_ID}...`)
 
   let txId: string
   try {
     const res = await circleClient.createContractExecutionTransaction({
       walletId: REPORTER_WALLET_ID,
       contractAddress: CONTRACT_ADDRESS,
-      abiFunctionSignature: 'transmit(int256,uint256)',
-      abiParameters: [price.toString(), timestamp.toString()],
+      abiFunctionSignature: 'transmit(int256,uint256,bytes)',
+      abiParameters: [price.toString(), timestamp.toString(), signature],
       fee: { type: 'level', config: { feeLevel: 'MEDIUM' } },
     })
     txId = res.data?.id ?? ''
@@ -491,8 +524,21 @@ async function runCycle(): Promise<void> {
   const block = await publicClient.getBlock()
   const timestamp = block.timestamp  // bigint, unix seconds
 
-  // Step 5: transmit
-  await transmitPrice(newPrice, timestamp)
+  // Step 5: compute the next round id for the signature payload.
+  // The contract verifies the signature was made over (contractAddress, answer, timestamp, nextRoundId).
+  // We read latestRound() to get the current counter, then add 1.
+  const currentRoundId = await publicClient.readContract({
+    address: CONTRACT_ADDRESS,
+    abi: ORACLE_ABI,
+    functionName: 'latestRound',
+  })
+  // latestRound() returns the full phaseId-encoded roundId. Extract the lower 64 bits
+  // (aggregator round counter) to compute the next sequential round number.
+  const aggregatorRoundCounter = BigInt(currentRoundId) & BigInt('0xFFFFFFFFFFFFFFFF')
+  const nextRoundId = aggregatorRoundCounter + 1n
+
+  // Step 6: sign and transmit
+  await transmitPrice(newPrice, timestamp, nextRoundId)
 }
 
 // ---------------------------------------------------------------------------

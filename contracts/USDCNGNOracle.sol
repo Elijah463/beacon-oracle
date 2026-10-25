@@ -34,6 +34,7 @@ library OracleErrors {
     error InvalidStaleness();
     /// @dev Thrown by the renounceOwnership override to prevent permanent governance loss.
     error RenounceOwnershipDisabled();
+    error InvalidSignature();
 }
 
 /**
@@ -78,6 +79,7 @@ contract USDCNGNOracle is
     uint256 private constant MAX_BPS         = 10_000;
     uint8   private constant ORACLE_DECIMALS = 8;
     uint256 private constant ORACLE_VERSION  = 1;
+    uint256 private constant PHASE_SHIFT     = 64;
 
     /// @dev Floor for maxStaleness. Prevents a governance mistake from bricking every read.
     uint256 private constant MIN_STALENESS = 60;
@@ -91,6 +93,9 @@ contract USDCNGNOracle is
 
     uint256 private latestRoundIdCounter;
 
+    /// @dev Phase id increments on every UUPS upgrade. Encoded into the upper 16 bits of roundId.
+    uint16 public phaseId;
+
     address public reporter;
     uint256 public maxStaleness;
     uint256 public deviationThresholdBps;
@@ -101,7 +106,7 @@ contract USDCNGNOracle is
     bool public requireConsumerAuthorization;
 
     /// @dev Reserved gap for future storage variables without slot collisions on upgrade.
-    uint256[50] private __gap;
+    uint256[49] private __gap;
 
     // -------------------------------------------------------------------------
     // Events
@@ -125,6 +130,7 @@ contract USDCNGNOracle is
     event ConsumerRemoved(address indexed consumer);
     event ConsumerAuthorizationRequirementUpdated(bool indexed oldValue, bool indexed newValue);
     event ContractUpgraded(address indexed newImplementation);
+    event NewTransmission(uint32 indexed aggregatorRoundId, int192 answer, address transmitter, uint16 phaseId);
 
     // -------------------------------------------------------------------------
     // Modifiers
@@ -192,8 +198,19 @@ contract USDCNGNOracle is
     /// @inheritdoc AggregatorV3Interface
     function version() external pure override returns (uint256) { return ORACLE_VERSION; }
 
+    /**
+     * @notice Returns the type and version string for Chainlink feed registry compatibility.
+     * @dev Chainlink feed registries and indexers call this to identify the aggregator type.
+     *      Format matches Chainlink convention: "<ContractType> <MajorVersion>.<MinorVersion>.<PatchVersion>"
+     */
+    function typeAndVersion() external pure returns (string memory) {
+        return "USDCNGNOracle 1.0.0";
+    }
+
     /// @notice Returns the latest round id counter.
-    function latestRound() external view returns (uint256) { return latestRoundIdCounter; }
+    function latestRound() external view returns (uint256) {
+        return uint256(_buildRoundId(phaseId, latestRoundIdCounter));
+    }
 
     // -------------------------------------------------------------------------
     // AggregatorV3Interface -- price reads
@@ -207,7 +224,7 @@ contract USDCNGNOracle is
     function latestAnswer() external view whenNotPaused returns (int256) {
         _enforceConsumerAuthorization();
         if (latestRoundIdCounter == 0) revert OracleErrors.NoDataAvailable();
-        RoundData memory round = _getRoundDataById(_toUint80(latestRoundIdCounter));
+        RoundData memory round = _getRoundDataById(_buildRoundId(phaseId, latestRoundIdCounter));
         _enforceFreshness(round.updatedAt);
         return round.answer;
     }
@@ -223,7 +240,7 @@ contract USDCNGNOracle is
     {
         _enforceConsumerAuthorization();
         if (latestRoundIdCounter == 0) revert OracleErrors.NoDataAvailable();
-        RoundData memory round = _getRoundDataById(_toUint80(latestRoundIdCounter));
+        RoundData memory round = _getRoundDataById(_buildRoundId(phaseId, latestRoundIdCounter));
         _enforceFreshness(round.updatedAt);
         return (round.roundId, round.answer, round.startedAt, round.updatedAt, round.answeredInRound);
     }
@@ -257,7 +274,7 @@ contract USDCNGNOracle is
         _enforceConsumerAuthorization();
         if (circuitBreakerTripped)    revert OracleErrors.CircuitBreakerActive();
         if (latestRoundIdCounter == 0) revert OracleErrors.NoDataAvailable();
-        RoundData memory round = _getRoundDataById(_toUint80(latestRoundIdCounter));
+        RoundData memory round = _getRoundDataById(_buildRoundId(phaseId, latestRoundIdCounter));
         _enforceFreshness(round.updatedAt);
         ngnAmount = (usdcAmount * uint256(round.answer)) / 1e12;
     }
@@ -273,7 +290,7 @@ contract USDCNGNOracle is
         _enforceConsumerAuthorization();
         if (circuitBreakerTripped)    revert OracleErrors.CircuitBreakerActive();
         if (latestRoundIdCounter == 0) revert OracleErrors.NoDataAvailable();
-        RoundData memory round = _getRoundDataById(_toUint80(latestRoundIdCounter));
+        RoundData memory round = _getRoundDataById(_buildRoundId(phaseId, latestRoundIdCounter));
         _enforceFreshness(round.updatedAt);
         if (round.answer <= 0) revert OracleErrors.InvalidAnswer();
         usdcAmount = (ngnAmount * 1e12) / uint256(round.answer);
@@ -294,7 +311,7 @@ contract USDCNGNOracle is
     ) {
         _enforceConsumerAuthorization();
         if (latestRoundIdCounter == 0) revert OracleErrors.NoDataAvailable();
-        RoundData memory round = _getRoundDataById(_toUint80(latestRoundIdCounter));
+        RoundData memory round = _getRoundDataById(_buildRoundId(phaseId, latestRoundIdCounter));
         _enforceFreshness(round.updatedAt);
         ageSeconds = block.timestamp - round.updatedAt;
         return (round.roundId, round.answer, round.updatedAt, ageSeconds);
@@ -305,26 +322,28 @@ contract USDCNGNOracle is
     // -------------------------------------------------------------------------
 
     /**
-     * @notice Submits a new oracle answer and advances the round counter.
-     *
-     * FINDING 1 FIX: when the circuit breaker fires, we SET the flag and RETURN (not revert)
-     * so the state change is committed. The reporter sees a successful tx with a
-     * CircuitBreakerTripped event and knows no new round was stored.
-     *
-     * Timestamp must be non-decreasing (>= last updatedAt) to handle Arc same-block timestamps.
-     * Timestamp window: must be <= block.timestamp and >= block.timestamp - maxStaleness.
-     *
+     * @notice Submits a new oracle answer with an ECDSA signature over the payload.
+     * @dev The reporter must sign keccak256(abi.encodePacked(address(this), answer, timestamp, latestRoundIdCounter + 1))
+     *      with the reporter's private key. The contract verifies the signature matches the reporter address.
+     *      This ensures the exact payload was signed by the reporter and not tampered in transit.
      * @param answer    The reported USDC/NGN price with 8 decimals (must be > 0).
-     * @param timestamp Data timestamp (must be >= last updatedAt, <= block.timestamp, >= block.timestamp - maxStaleness).
+     * @param timestamp Data timestamp (must be >= last updatedAt, <= block.timestamp, within maxStaleness).
+     * @param signature ECDSA signature (65 bytes) over keccak256(abi.encodePacked(address(this), answer, timestamp, latestRoundIdCounter + 1)).
      */
-    function transmit(int256 answer, uint256 timestamp) external onlyReporter whenNotPaused {
+    function transmit(int256 answer, uint256 timestamp, bytes calldata signature) external onlyReporter whenNotPaused {
         if (circuitBreakerTripped) revert OracleErrors.CircuitBreakerActive();
         if (answer <= 0)           revert OracleErrors.InvalidAnswer();
+
+        // Verify ECDSA signature: reporter must have signed the exact payload
+        bytes32 payloadHash = keccak256(abi.encodePacked(address(this), answer, timestamp, latestRoundIdCounter + 1));
+        bytes32 ethSignedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash));
+        address recovered = _recoverSigner(ethSignedHash, signature);
+        if (recovered != reporter) revert OracleErrors.InvalidSignature();
 
         _enforceTimestampWindow(timestamp);
 
         if (latestRoundIdCounter != 0) {
-            RoundData memory latest = _getRoundDataById(_toUint80(latestRoundIdCounter));
+            RoundData memory latest = _getRoundDataById(_buildRoundId(phaseId, latestRoundIdCounter));
 
             // Timestamps must be non-decreasing. On Arc, consecutive blocks may share
             // the same block.timestamp, so we allow equal timestamps here.
@@ -342,7 +361,7 @@ contract USDCNGNOracle is
         }
 
         uint256 nextRoundId   = latestRoundIdCounter + 1;
-        uint80  nextRoundId80 = _toUint80(nextRoundId);
+        uint80  nextRoundId80 = _buildRoundId(phaseId, nextRoundId);
 
         roundBuffer[nextRoundId % BUFFER_SIZE] = RoundData({
             roundId:         nextRoundId80,
@@ -354,6 +373,7 @@ contract USDCNGNOracle is
 
         latestRoundIdCounter = nextRoundId;
         emit AnswerUpdated(answer, nextRoundId, timestamp);
+        emit NewTransmission(uint32(nextRoundId), int192(answer), msg.sender, phaseId);
     }
 
     // -------------------------------------------------------------------------
@@ -429,14 +449,14 @@ contract USDCNGNOracle is
 
         // Ensure non-decreasing timestamp ordering (same rule as transmit).
         if (latestRoundIdCounter != 0) {
-            RoundData memory latest = _getRoundDataById(_toUint80(latestRoundIdCounter));
+            RoundData memory latest = _getRoundDataById(_buildRoundId(phaseId, latestRoundIdCounter));
             if (timestamp < latest.updatedAt) revert OracleErrors.InvalidTimestamp();
         }
 
         circuitBreakerTripped = false;
 
         uint256 nextRoundId   = latestRoundIdCounter + 1;
-        uint80  nextRoundId80 = _toUint80(nextRoundId);
+        uint80  nextRoundId80 = _buildRoundId(phaseId, nextRoundId);
 
         roundBuffer[nextRoundId % BUFFER_SIZE] = RoundData({
             roundId:         nextRoundId80,
@@ -491,6 +511,7 @@ contract USDCNGNOracle is
 
     /// @notice Only the owner may authorize a new implementation.
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        phaseId += 1;
         emit ContractUpgraded(newImplementation);
     }
 
@@ -498,9 +519,26 @@ contract USDCNGNOracle is
     // Internal helpers
     // -------------------------------------------------------------------------
 
+    /// @dev Encodes phaseId into the upper 16 bits of a uint80 roundId, matching Chainlink proxy convention.
+    function _buildRoundId(uint16 _phaseId, uint256 aggregatorRoundId) internal pure returns (uint80) {
+        // Chainlink format: phaseId occupies bits [79:64], aggregatorRoundId occupies bits [63:0]
+        return uint80((uint256(_phaseId) << PHASE_SHIFT) | aggregatorRoundId);
+    }
+
+    /// @dev Extracts the aggregatorRoundId (lower 64 bits) from a full Chainlink-style roundId.
+    function _extractAggregatorRoundId(uint80 fullRoundId) internal pure returns (uint64) {
+        return uint64(fullRoundId & type(uint64).max);
+    }
+
+    /// @dev Extracts the phaseId (upper 16 bits) from a full Chainlink-style roundId.
+    function _extractPhaseId(uint80 fullRoundId) external pure returns (uint16) {
+        return uint16(fullRoundId >> PHASE_SHIFT);
+    }
+
     function _getRoundDataById(uint80 _roundId) internal view returns (RoundData memory round) {
-        if (_roundId == 0 || uint256(_roundId) > latestRoundIdCounter) revert OracleErrors.NoDataAvailable();
-        round = roundBuffer[uint256(_roundId) % BUFFER_SIZE];
+        uint64 aggRoundId = _extractAggregatorRoundId(_roundId);
+        if (aggRoundId == 0 || uint256(aggRoundId) > latestRoundIdCounter) revert OracleErrors.NoDataAvailable();
+        round = roundBuffer[uint256(aggRoundId) % BUFFER_SIZE];
         if (round.roundId != _roundId) revert OracleErrors.NoDataAvailable();
     }
 
@@ -531,6 +569,27 @@ contract USDCNGNOracle is
         uint256 incomingU = uint256(incoming);
         uint256 absDiff   = currentU > incomingU ? currentU - incomingU : incomingU - currentU;
         return (absDiff * MAX_BPS) / currentU;
+    }
+
+    /**
+     * @dev Recovers the signer address from an Ethereum signed message hash and a 65-byte ECDSA signature.
+     *      Supports both 27/28 and 0/1 v values.
+     */
+    function _recoverSigner(bytes32 ethSignedHash, bytes calldata sig) internal pure returns (address) {
+        if (sig.length != 65) revert OracleErrors.InvalidSignature();
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+        assembly {
+            r := calldataload(sig.offset)
+            s := calldataload(add(sig.offset, 32))
+            v := byte(0, calldataload(add(sig.offset, 64)))
+        }
+        if (v < 27) v += 27;
+        if (v != 27 && v != 28) revert OracleErrors.InvalidSignature();
+        address recovered = ecrecover(ethSignedHash, v, r, s);
+        if (recovered == address(0)) revert OracleErrors.InvalidSignature();
+        return recovered;
     }
 
     function _toUint80(uint256 value) internal pure returns (uint80) {
