@@ -1,7 +1,10 @@
 # fly.toml -- BEACON Oracle reporter on Fly.io
+#
 # First time setup:
-#   1. fly launch --no-deploy  (imports this config, creates the app)
-#   2. fly secrets set CIRCLE_API_KEY=... CIRCLE_ENTITY_SECRET=... REPORTER_WALLET_ID=... REPORTER_WALLET_ADDRESS=... REPORTER_SIGNING_KEY=... NGN_PROXY_URL=...
+#   1. fly launch --no-deploy
+#   2. fly secrets set CIRCLE_API_KEY=... CIRCLE_ENTITY_SECRET=... \
+#        REPORTER_WALLET_ID=... REPORTER_WALLET_ADDRESS=... \
+#        REPORTER_SIGNING_KEY=... NGN_PROXY_URL=...
 #   3. fly deploy
 #
 # Subsequent deploys: fly deploy
@@ -10,16 +13,14 @@ app            = "beacon-oracle-reporter"
 primary_region = "lhr"
 
 [build]
-  # Dockerfile is in the repo root -- Fly detects it automatically.
-  # Uses Bun runtime (Fly's built-in Node runtime does not include Bun).
+  # Dockerfile is in the repo root.
 
 [env]
-  # Public env var -- safe to commit. Secrets go via: fly secrets set KEY=value
   VITE_ORACLE_CONTRACT_ADDRESS = "0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797"
 
-# No HTTP service -- pure background worker.
-[processes]
-  reporter = "bun run scripts/reporter.ts"
+# No [[services]] block -- this is a pure background worker with no HTTP port.
+# The Dockerfile CMD runs the reporter directly.
+# Fly keeps it alive and restarts on crash via the [[restart]] policy below.
 
 [[restart]]
   policy      = "always"
