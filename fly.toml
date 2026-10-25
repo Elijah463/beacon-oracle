@@ -1,27 +1,29 @@
-# fly.toml -- BEACON Oracle reporter on Fly.io
+# fly.toml app configuration file generated for beacon-oracle on 2026-10-25T22:13:07Z
 #
-# First time setup:
-#   1. fly launch --no-deploy
-#   2. fly secrets set CIRCLE_API_KEY=... CIRCLE_ENTITY_SECRET=... \
-#        REPORTER_WALLET_ID=... REPORTER_WALLET_ADDRESS=... \
-#        REPORTER_SIGNING_KEY=... NGN_PROXY_URL=...
-#   3. fly deploy
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
-# Subsequent deploys: fly deploy
 
-app            = "beacon-oracle-reporter"
-primary_region = "lhr"
+app = 'beacon-oracle'
+primary_region = 'lhr'
 
 [build]
-  # Dockerfile is in the repo root.
 
 [env]
-  VITE_ORACLE_CONTRACT_ADDRESS = "0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797"
+  VITE_ORACLE_CONTRACT_ADDRESS = '0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797'
 
-# No [[services]] block -- this is a pure background worker with no HTTP port.
-# The Dockerfile CMD runs the reporter directly.
-# Fly keeps it alive and restarts on crash via the [[restart]] policy below.
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
 
 [[restart]]
-  policy      = "always"
-  max_retries = 10
+  policy = 'always'
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024
