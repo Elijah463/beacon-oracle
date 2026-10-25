@@ -1,30 +1,63 @@
 # BEACON Oracle -- Agent Notes
 
-## Latest Deployed Contract (v6)
-- **Address:** `0x69f5716e6453e2a43910f6cfea06500056fcf5e6`
-- **Network:** Arc Testnet
-- **Explorer:** https://explorer.testnet.arc.io/address/0x69f5716e6453e2a43910f6cfea06500056fcf5e6
-- **Pattern:** UUPS upgradeable proxy (implementation + ERC-1967 proxy)
-- **Deployed:** 2026-10-25
+## Deployed Contracts (Arc Testnet)
 
-## Deployment History
-| Version | Address | What changed |
-|---------|---------|-------------|
-| v6 | `0x69f5716e6453e2a43910f6cfea06500056fcf5e6` | typeAndVersion(), phaseId roundId encoding, ECDSA signature verification on transmit() |
-| v5 | `0xfacb599c862322229a1861df76a7fbf26ebf9f55` | Arc timestamp monotonicity fix, resetCircuitBreakerAndPublish timestamp guard |
-| v4 | `0x5147ebbc5d7124a27325a0ea04f6b552410ec90d` | All 17 audit findings fixed |
-| v3 | `0x0135d528f94f861118d4bf7e885c836a1763bce4` | BEACON rebrand, light theme, UUPS upgradeable |
-| v2 | `0xdacfdb464393bfa6e34e442f9a5775971fdc7607` | Quote functions, Ownable2Step, MIN_STALENESS |
-| v1 | `0xb83c7df0d7aae3c5b80d6c9cbda669f2fc53ab46` | Initial deploy |
+### LIVE CONTRACT (owner-controlled, use this one)
+| Field | Value |
+|---|---|
+| Proxy address | `0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797` |
+| Implementation | `0xe0e4894106B1e517752515D40601ec890262e0ea` |
+| Owner wallet | `0xBA29b16Adbf5F1D7dD2CeD98fE57189388c65B76` |
+| Reporter signing address | `0xdCF40c61Cc7A1D9A9C7F90f0be80A05797757d7b` |
+| Deployed via | `forge script contracts/script/DeployBeacon.s.sol` |
+| Explorer | https://explorer.testnet.arc.io/address/0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 |
+| Network | Arc Testnet (chainId 5042002) |
+| Contract version | v6 (UUPS upgradeable, phaseId encoding, ECDSA signature verification, typeAndVersion) |
+
+### Previous deployments (Circle SCP deployer -- owner is Circle wallet, not usable for governance)
+| Address | Notes |
+|---|---|
+| `0x69f5716e6453e2a43910f6cfea06500056fcf5e6` | v6 implementation only (no proxy) |
+| `0xfacb599c862322229a1861df76a7fbf26ebf9f55` | v5 |
+| `0x5147ebbc5d7124a27325a0ea04f6b552410ec90d` | v4 |
+| `0x0135d528f94f861118d4bf7e885c836a1763bce4` | v3 |
+| `0xdacfdb464393bfa6e34e442f9a5775971fdc7607` | v2 |
+| `0xb83c7df0d7aae3c5b80d6c9cbda669f2fc53ab46` | v1 |
+
+## Wallet Roles
+| Role | Address | Has private key? |
+|---|---|---|
+| Owner (governance) | `0xBA29b16Adbf5F1D7dD2CeD98fE57189388c65B76` | Yes -- OWNER_PRIVATE_KEY in .env |
+| Reporter signing key | `0xdCF40c61Cc7A1D9A9C7F90f0be80A05797757d7b` | Yes -- REPORTER_SIGNING_KEY in .env |
+| Circle reporter wallet | Set after setup-reporter-wallet.ts | Yes -- managed by Circle SDK |
 
 ## Architecture
-- **Off-chain:** `scripts/reporter.ts` runs every 30s, fetches 9 price sources (5 USDC/USD CEX + 4 NGN/USDT P2P), derives median USDC/NGN, signs payload with REPORTER_SIGNING_KEY, submits via Circle developer-controlled wallet
-- **On-chain:** `contracts/USDCNGNOracle.sol` -- Chainlink AggregatorV3Interface compatible, 100-slot circular buffer, ECDSA signature verification, phaseId-encoded roundIds, circuit breaker, UUPS upgradeable
-- **Frontend:** React + wagmi dashboard on Arc Testnet, polls contract every 15s
+- Off-chain reporter (scripts/reporter.ts) fetches USDC/USD (5 CEX sources) and NGN/USDT (4 P2P sources)
+- Derives USDC/NGN = median(USDC/USD) x median(NGN/USDT) using BigInt arithmetic
+- Signs the payload with REPORTER_SIGNING_KEY, submits via Circle developer-controlled wallet
+- Contract verifies ECDSA signature on-chain before writing each round
+- Chainlink AggregatorV3Interface compatible: latestRoundData(), getRoundData(), quoteUSDCToNGN(), quoteNGNToUSDC()
+- UUPS upgradeable: owner calls upgradeToAndCall() to upgrade implementation
+- phaseId increments on every upgrade -- encoded in upper 16 bits of roundId
+- Circuit breaker: trips if single update moves price >10%, freezes feed until owner resets
 
-## Key Decisions
-- USDT used as USD proxy for NGN/USDT leg (realistic Nigerian P2P market price)
-- Nigerian residential proxy (NGN_PROXY_URL) needed for P2P sources from non-Nigerian IPs
-- REPORTER_SIGNING_KEY is separate from the Circle wallet -- signing key address is set as `reporter` on contract
-- phaseId starts at 0, increments on every UUPS upgrade via _authorizeUpgrade()
-- Circuit breaker: trips on >circuitBreakerBps move in one update, requires owner reset
+## Key Commands
+```bash
+# Check current reporter
+cast call 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "reporter()(address)" --rpc-url https://rpc.testnet.arc.io
+
+# Check circuit breaker
+cast call 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "circuitBreakerTripped()(bool)" --rpc-url https://rpc.testnet.arc.io
+
+# Check latest round
+cast call 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "latestRound()(uint256)" --rpc-url https://rpc.testnet.arc.io
+
+# Reset circuit breaker (owner only)
+cast send 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "resetCircuitBreaker()" --private-key $OWNER_PRIVATE_KEY --rpc-url https://rpc.testnet.arc.io
+
+# Set reporter signing address (owner only)
+cast send 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "setReporter(address)" <NEW_ADDRESS> --private-key $OWNER_PRIVATE_KEY --rpc-url https://rpc.testnet.arc.io
+
+# Upgrade implementation (owner only)
+cast send 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "upgradeToAndCall(address,bytes)" <NEW_IMPL> 0x --private-key $OWNER_PRIVATE_KEY --rpc-url https://rpc.testnet.arc.io
+```
