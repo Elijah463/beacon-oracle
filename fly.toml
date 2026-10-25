@@ -1,24 +1,26 @@
 # fly.toml -- BEACON Oracle reporter on Fly.io
-# Deploy with: fly deploy
-# First time:  fly launch --no-deploy, then fly deploy
+# First time setup:
+#   1. fly launch --no-deploy  (imports this config, creates the app)
+#   2. fly secrets set CIRCLE_API_KEY=... CIRCLE_ENTITY_SECRET=... REPORTER_WALLET_ID=... REPORTER_WALLET_ADDRESS=... REPORTER_SIGNING_KEY=... NGN_PROXY_URL=...
+#   3. fly deploy
+#
+# Subsequent deploys: fly deploy
 
-app = "beacon-oracle-reporter"
-primary_region = "lhr"   # London -- good latency to Nigerian P2P endpoints via proxy
+app            = "beacon-oracle-reporter"
+primary_region = "lhr"
 
 [build]
-  # Fly.io detects the Dockerfile automatically. We use a Dockerfile so we can
-  # install Bun (Fly's built-in runtimes do not include Bun).
+  # Dockerfile is in the repo root -- Fly detects it automatically.
+  # Uses Bun runtime (Fly's built-in Node runtime does not include Bun).
 
 [env]
-  # Non-secret env vars -- secrets are set via: fly secrets set KEY=value
-  VITE_ORACLE_CONTRACT_ADDRESS = "0xfacb599c862322229a1861df76a7fbf26ebf9f55"
+  # Public env var -- safe to commit. Secrets go via: fly secrets set KEY=value
+  VITE_ORACLE_CONTRACT_ADDRESS = "0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797"
 
-# No HTTP service -- this is a pure background worker process.
-# Fly.io will keep it running and auto-restart on crash (including circuit breaker exit).
-[[processes]]
-  name = "reporter"
-  entrypoint = ["bun", "run", "scripts/reporter.ts"]
+# No HTTP service -- pure background worker.
+[processes]
+  reporter = "bun run scripts/reporter.ts"
 
-[restart]
-  policy = "always"
+[[restart]]
+  policy      = "always"
   max_retries = 10
