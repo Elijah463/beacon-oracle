@@ -41,7 +41,6 @@ import { initiateDeveloperControlledWalletsClient } from '@circle-fin/developer-
 import { createPublicClient, http, encodePacked, keccak256 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { arcTestnet } from 'viem/chains'
-import { HttpsProxyAgent } from 'https-proxy-agent'
 
 import {
   fetchUsdcUsdCoinbase,
@@ -71,6 +70,12 @@ const CIRCLE_ENTITY_SECRET = process.env.CIRCLE_ENTITY_SECRET
 const REPORTER_WALLET_ID   = process.env.REPORTER_WALLET_ID ?? ''
 const CONTRACT_ADDRESS     = (process.env.VITE_ORACLE_CONTRACT_ADDRESS ?? '') as `0x${string}`
 
+// CF_WORKER_URL: your Cloudflare Worker relay URL for Nigerian P2P geo-bypass.
+// Format: https://beacon-ngn-relay.yourname.workers.dev
+// Deploy cloudflare-worker/index.js to Cloudflare, set this to its URL.
+// If not set, P2P sources are fetched directly (works from Nigerian IPs only).
+const CF_WORKER_URL = process.env.CF_WORKER_URL ?? ''
+
 // REPORTER_SIGNING_KEY: a plain hex private key used ONLY for signing the
 // transmit() payload off-chain. This key's address must be set as the
 // `reporter` on the oracle contract via setReporter().
@@ -79,14 +84,7 @@ const CONTRACT_ADDRESS     = (process.env.VITE_ORACLE_CONTRACT_ADDRESS ?? '') as
 // cannot submit a forged price because they cannot produce a valid payload signature.
 const REPORTER_SIGNING_KEY = (process.env.REPORTER_SIGNING_KEY ?? '') as `0x${string}`
 
-// NGN proxy: Nigerian residential proxy URL for geo-restricted P2P endpoints.
-// Format: http://user:pass@host:port  (or socks5://user:pass@host:port)
-// Only the 4 P2P fetchers use this. USDC/USD sources never use a proxy.
-// If not set, P2P sources are attempted directly (works from Nigerian IPs).
-const NGN_PROXY_URL = process.env.NGN_PROXY_URL ?? ''
-const ngnProxy = NGN_PROXY_URL
-  ? new HttpsProxyAgent(NGN_PROXY_URL)
-  : undefined
+
 
 if (!CIRCLE_API_KEY)        { console.error('[BEACON] CIRCLE_API_KEY not set');        process.exit(1) }
 if (!CIRCLE_ENTITY_SECRET)  { console.error('[BEACON] CIRCLE_ENTITY_SECRET not set');  process.exit(1) }
@@ -98,10 +96,10 @@ if (!REPORTER_SIGNING_KEY)  { console.error('[BEACON] REPORTER_SIGNING_KEY not s
 const signingAccount = privateKeyToAccount(REPORTER_SIGNING_KEY)
 console.log(`[BEACON] Signing address:  ${signingAccount.address} (must match setReporter() on contract)`)
 
-if (NGN_PROXY_URL) {
-  console.log('[BEACON] NGN proxy: configured (Nigerian residential proxy active for P2P sources)')
+if (CF_WORKER_URL) {
+  console.log('[BEACON] CF Worker relay: configured -- P2P sources routed via Cloudflare Lagos edge')
 } else {
-  console.log('[BEACON] NGN proxy: not set -- P2P sources will be attempted directly')
+  console.log('[BEACON] CF Worker relay: not set -- P2P sources attempted directly (needs Nigerian IP)')
 }
 
 // ---------------------------------------------------------------------------
@@ -243,10 +241,10 @@ async function derivePrice(): Promise<bigint> {
       () => fetchUsdcUsdBybit(),
     ]),
     fetchAll([
-      () => fetchNgnUsdtBinanceP2P(ngnProxy),
-      () => fetchNgnUsdtQuidax(ngnProxy),
-      () => fetchNgnUsdtBybitP2P(ngnProxy),
-      () => fetchNgnUsdtBitgetP2P(BITGET_API_KEY, ngnProxy),
+      () => fetchNgnUsdtBinanceP2P(CF_WORKER_URL),
+      () => fetchNgnUsdtQuidax(CF_WORKER_URL),
+      () => fetchNgnUsdtBybitP2P(CF_WORKER_URL),
+      () => fetchNgnUsdtBitgetP2P(BITGET_API_KEY, CF_WORKER_URL),
     ]),
   ])
 

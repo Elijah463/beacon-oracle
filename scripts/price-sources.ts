@@ -19,14 +19,14 @@
  *   - Sanity bounds: values outside hard limits are rejected before entering aggregation
  *   - Error messages never include URLs (no API key leakage in logs)
  *
- * PROXY SUPPORT (NGN/USDT P2P sources only):
- *   P2P endpoints geo-restrict requests from non-Nigerian IPs. Pass a Nigerian
- *   residential proxy URL via the `proxy` parameter on each P2P fetcher.
- *   Set NGN_PROXY_URL in .env: http://user:pass@host:port
- *   The USDC/USD sources (Leg A) never use a proxy -- they work from any IP.
+ * CLOUDFLARE WORKER RELAY (NGN/USDT P2P sources only):
+ *   P2P endpoints geo-restrict requests from non-Nigerian IPs. The reporter
+ *   routes P2P fetches through a Cloudflare Worker deployed at CF_WORKER_URL.
+ *   Cloudflare's Lagos edge node makes the request appear to originate from Nigeria.
+ *   The USDC/USD sources (Leg A) always fetch directly -- they work from any IP.
+ *   If CF_WORKER_URL is not set, P2P sources are attempted directly (works from
+ *   Nigerian IPs or when testing locally).
  */
-
-import { HttpsProxyAgent } from 'https-proxy-agent'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -81,7 +81,6 @@ export class RateLimiter {
   }
 
   async acquire(): Promise<void> {
-    // Refill tokens based on elapsed time
     const now = Date.now()
     const elapsed = (now - this.lastRefill) / 1000
     this.tokens = Math.min(this.maxTokens, this.tokens + elapsed * this.refillRateHz)
@@ -92,7 +91,6 @@ export class RateLimiter {
       return
     }
 
-    // Wait until the next token is available
     const waitMs = Math.ceil((1 - this.tokens) / this.refillRateHz * 1000)
     await sleep(waitMs)
     this.tokens = 0
@@ -100,24 +98,99 @@ export class RateLimiter {
   }
 }
 
-// Per-provider rate limiters (configurable -- edit these if a provider tightens limits)
-// Rates are conservative to stay well within free/unauthenticated tiers.
+// Per-provider rate limiters (conservative -- stay well within free tiers)
 export const limiters: Record<string, RateLimiter> = {
-  // USDC/USD sources
-  'Coinbase':       new RateLimiter(3, 0.5),   // 1 req / 2s, burst 3
-  'BinanceCEX':     new RateLimiter(3, 0.5),   // 1 req / 2s, burst 3
-  'OKX':            new RateLimiter(3, 0.5),   // 1 req / 2s, burst 3
-  'BitgetCEX':      new RateLimiter(2, 0.33),  // ~1 req / 3s, burst 2
-  'BybitCEX':       new RateLimiter(2, 0.33),  // ~1 req / 3s, burst 2
-  // NGN/USDT P2P sources
-  'BinanceP2P':     new RateLimiter(2, 0.2),   // 1 req / 5s, burst 2
-  'Quidax':         new RateLimiter(3, 0.5),   // 1 req / 2s, burst 3
-  'BybitP2P':       new RateLimiter(2, 0.2),   // 1 req / 5s, burst 2
-  'BitgetP2P':      new RateLimiter(2, 0.2),   // 1 req / 5s, burst 2
+  'Coinbase':       new RateLimiter(3, 0.5),
+  'BinanceCEX':     new RateLimiter(3, 0.5),
+  'OKX':            new RateLimiter(3, 0.5),
+  'BitgetCEX':      new RateLimiter(2, 0.33),
+  'BybitCEX':       new RateLimiter(2, 0.33),
+  'BinanceP2P':     new RateLimiter(2, 0.2),
+  'Quidax':         new RateLimiter(3, 0.5),
+  'BybitP2P':       new RateLimiter(2, 0.2),
+  'BitgetP2P':      new RateLimiter(2, 0.2),
 }
 
 // ---------------------------------------------------------------------------
-// Fetch helper with timeout, 429 backoff, and URL-redacted errors
+// Cloudflare Worker relay helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Routes a request through the Cloudflare Worker relay when cfWorkerUrl is set.
+ * The Worker forwards the request from Cloudflare's Lagos edge node, making it
+ * appear to originate from Nigeria to geo-restricted P2P endpoints.
+ *
+ * If cfWorkerUrl is empty, falls back to a direct fetch (works from Nigerian IPs).
+ */
+async function cfFetch(
+  cfWorkerUrl: string,
+  targetUrl: string,
+  sourceName: string,
+  opts: {
+    method?: string
+    body?: unknown
+    headers?: Record<string, string>
+    timeoutMs?: number
+  } = {}
+): Promise<unknown> {
+  const { method = 'GET', body, headers = {}, timeoutMs = 12_000 } = opts
+
+  // Direct fetch when no Worker URL is configured
+  if (!cfWorkerUrl) {
+    return fetchJson(targetUrl, sourceName, {
+      method,
+      body: body ? JSON.stringify(body) : undefined,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+        ...headers,
+      },
+      timeoutMs,
+    })
+  }
+
+  // Route through Cloudflare Worker relay
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+
+  try {
+    const res = await fetch(cfWorkerUrl, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: targetUrl,
+        method,
+        body,
+        headers,
+      }),
+    })
+    clearTimeout(timer)
+
+    if (res.status === 429) {
+      const retryAfter = res.headers.get('Retry-After')
+      const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 5_000
+      console.warn(`[${sourceName}] CF Worker 429. Waiting ${waitMs}ms.`)
+      await sleep(waitMs)
+      throw new Error(`${sourceName}: rate limited by CF Worker relay`)
+    }
+
+    if (!res.ok) {
+      throw new Error(`${sourceName}: CF Worker returned HTTP ${res.status}`)
+    }
+
+    return await res.json()
+  } catch (err: unknown) {
+    clearTimeout(timer)
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`${sourceName}: CF Worker relay timed out after ${timeoutMs}ms`)
+    }
+    throw err
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fetch helper (direct -- used for Leg A USDC/USD sources)
 // ---------------------------------------------------------------------------
 
 interface FetchOptions {
@@ -126,8 +199,6 @@ interface FetchOptions {
   headers?: Record<string, string>
   method?: string
   body?: string
-  /** Optional Nigerian residential proxy agent for geo-restricted P2P endpoints. */
-  agent?: HttpsProxyAgent<string>
 }
 
 async function fetchJson(
@@ -135,7 +206,7 @@ async function fetchJson(
   sourceName: string,
   opts: FetchOptions = {}
 ): Promise<unknown> {
-  const { timeoutMs = 8_000, maxRetries = 2, headers = {}, method = 'GET', body, agent } = opts
+  const { timeoutMs = 8_000, maxRetries = 2, headers = {}, method = 'GET', body } = opts
 
   let attempt = 0
   let backoffMs = 1_000
@@ -150,15 +221,10 @@ async function fetchJson(
         method,
         headers: { 'Accept': 'application/json', ...headers },
         body,
-        // Pass proxy agent when provided. HttpsProxyAgent is compatible with
-        // Node's undici Dispatcher interface at runtime. We cast through unknown
-        // to avoid the unsafe-any lint rule while keeping the type explicit.
-        ...(agent ? { dispatcher: agent as unknown as import('undici').Dispatcher } : {}),
       })
       clearTimeout(timer)
 
       if (res.status === 429) {
-        // Respect Retry-After if present, otherwise exponential backoff
         const retryAfter = res.headers.get('Retry-After')
         const waitMs = retryAfter
           ? Math.min(parseInt(retryAfter, 10) * 1000, 60_000)
@@ -170,10 +236,7 @@ async function fetchJson(
         continue
       }
 
-      if (!res.ok) {
-        throw new Error(`${sourceName} HTTP ${res.status}`)
-      }
-
+      if (!res.ok) throw new Error(`${sourceName} HTTP ${res.status}`)
       return await res.json()
 
     } catch (err: unknown) {
@@ -183,13 +246,11 @@ async function fetchJson(
         throw new Error(`${sourceName} timed out after ${timeoutMs}ms`)
       }
 
-      // Redact URLs from error messages (prevents API key leakage in logs)
       const msg = err instanceof Error ? err.message : String(err)
       if (msg.includes('http://') || msg.includes('https://')) {
         throw new Error(`${sourceName} network error (details redacted)`)
       }
 
-      // On the last attempt, throw. Otherwise wait and retry.
       if (attempt >= maxRetries) throw err
       await sleep(backoffMs)
       backoffMs = Math.min(backoffMs * 2, 30_000)
@@ -201,13 +262,9 @@ async function fetchJson(
 }
 
 // ---------------------------------------------------------------------------
-// USDC / USD sources  (Leg A)
+// USDC / USD sources  (Leg A -- direct fetch, works from any IP)
 // ---------------------------------------------------------------------------
 
-/**
- * Coinbase: USDC/USD -- genuine USD pair, no USDT proxy.
- * Public endpoint, no auth required.
- */
 export async function fetchUsdcUsdCoinbase(): Promise<SourceResult> {
   await limiters['Coinbase'].acquire()
   const data = await fetchJson(
@@ -219,11 +276,6 @@ export async function fetchUsdcUsdCoinbase(): Promise<SourceResult> {
   return { source: 'Coinbase', value, fetchedAt: Date.now() }
 }
 
-/**
- * Binance: USDC/USDT spot price.
- * NOTE: Uses USDT as a USD proxy. USDT has its own depeg risk.
- * Included for volume diversity. Outlier filter handles USDT deviations.
- */
 export async function fetchUsdcUsdBinance(): Promise<SourceResult> {
   await limiters['BinanceCEX'].acquire()
   const data = await fetchJson(
@@ -235,10 +287,6 @@ export async function fetchUsdcUsdBinance(): Promise<SourceResult> {
   return { source: 'Binance', value, fetchedAt: Date.now() }
 }
 
-/**
- * OKX: USDC/USDT spot price.
- * Public market data endpoint, no API key required.
- */
 export async function fetchUsdcUsdOKX(): Promise<SourceResult> {
   await limiters['OKX'].acquire()
   const data = await fetchJson(
@@ -251,10 +299,6 @@ export async function fetchUsdcUsdOKX(): Promise<SourceResult> {
   return { source: 'OKX', value, fetchedAt: Date.now() }
 }
 
-/**
- * Bitget: USDC/USDT spot price.
- * Public endpoint, no API key required.
- */
 export async function fetchUsdcUsdBitget(): Promise<SourceResult> {
   await limiters['BitgetCEX'].acquire()
   const data = await fetchJson(
@@ -267,10 +311,6 @@ export async function fetchUsdcUsdBitget(): Promise<SourceResult> {
   return { source: 'Bitget', value, fetchedAt: Date.now() }
 }
 
-/**
- * Bybit: USDC/USDT spot price.
- * Public endpoint, no API key required.
- */
 export async function fetchUsdcUsdBybit(): Promise<SourceResult> {
   await limiters['BybitCEX'].acquire()
   const data = await fetchJson(
@@ -284,35 +324,30 @@ export async function fetchUsdcUsdBybit(): Promise<SourceResult> {
 }
 
 // ---------------------------------------------------------------------------
-// NGN / USDT sources  (Leg B -- P2P markets)
+// NGN / USDT sources  (Leg B -- routed via CF Worker for Nigerian IP)
 // ---------------------------------------------------------------------------
 
 /**
  * Binance P2P: NGN/USDT buy-side median.
- * Scrapes the public P2P ads endpoint (no auth required).
- * Returns the median of the top-5 active SELL ads (what a buyer pays in NGN).
+ * Routes through CF Worker relay for Nigerian IP geo-bypass.
+ * cfWorkerUrl: set CF_WORKER_URL in .env (your Cloudflare Worker URL).
  */
-export async function fetchNgnUsdtBinanceP2P(proxy?: HttpsProxyAgent<string>): Promise<SourceResult> {
+export async function fetchNgnUsdtBinanceP2P(cfWorkerUrl: string): Promise<SourceResult> {
   await limiters['BinanceP2P'].acquire()
-  const body = JSON.stringify({
+  const body = {
     asset: 'USDT',
     fiat: 'NGN',
-    tradeType: 'SELL',   // SELL = merchant selling USDT; buyer pays NGN
+    tradeType: 'SELL',
     page: 1,
     rows: 10,
     publisherType: null,
     payTypes: [],
-  })
-  const data = await fetchJson(
+  }
+  const data = await cfFetch(
+    cfWorkerUrl,
     'https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search',
     'BinanceP2P',
-    {
-      method: 'POST',
-      body,
-      headers: { 'Content-Type': 'application/json' },
-      timeoutMs: 12_000,
-      agent: proxy,
-    }
+    { method: 'POST', body, timeoutMs: 12_000 }
   ) as { data: Array<{ adv: { price: string } }> }
 
   if (!data.data?.length) throw new Error('BinanceP2P: no active ads returned')
@@ -328,25 +363,15 @@ export async function fetchNgnUsdtBinanceP2P(proxy?: HttpsProxyAgent<string>): P
 
 /**
  * Quidax: NGN/USDT last trade price.
- * Quidax is a Nigerian exchange -- its NGN/USDT spot rate directly reflects
- * local market conditions. Public ticker endpoint, no auth required.
- * NOTE: Quidax may geo-restrict requests from non-Nigerian IPs. This source
- * works reliably when the reporter runs on a Nigerian or West African VPS.
- * The endpoint returns { data: { ticker: { last: "1640.00", ... } } }
+ * Nigerian exchange -- direct reflection of local market conditions.
  */
-export async function fetchNgnUsdtQuidax(proxy?: HttpsProxyAgent<string>): Promise<SourceResult> {
+export async function fetchNgnUsdtQuidax(cfWorkerUrl: string): Promise<SourceResult> {
   await limiters['Quidax'].acquire()
-  // Quidax uses lowercase pair notation: usdtngn (USDT quoted in NGN)
-  const data = await fetchJson(
+  const data = await cfFetch(
+    cfWorkerUrl,
     'https://www.quidax.com/api/v1/markets/tickers/usdtngn',
     'Quidax',
-    {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-      },
-      agent: proxy,
-    }
+    { timeoutMs: 10_000 }
   ) as { data: { ticker: { last: string } } }
   const raw = data.data?.ticker?.last
   if (!raw) throw new Error('Quidax: missing ticker.last in response')
@@ -357,15 +382,14 @@ export async function fetchNgnUsdtQuidax(proxy?: HttpsProxyAgent<string>): Promi
 
 /**
  * Bybit P2P: NGN/USDT buy-side median from active sell ads.
- * Public P2P ads endpoint, no auth required.
  */
-export async function fetchNgnUsdtBybitP2P(proxy?: HttpsProxyAgent<string>): Promise<SourceResult> {
+export async function fetchNgnUsdtBybitP2P(cfWorkerUrl: string): Promise<SourceResult> {
   await limiters['BybitP2P'].acquire()
-  const data = await fetchJson(
-    'https://api2.bybit.com/fiat/otc/item/online?' +
-      'userId=&tokenId=USDT&currencyId=NGN&payment=&side=1&size=10&page=1&amount=',
+  const data = await cfFetch(
+    cfWorkerUrl,
+    'https://api2.bybit.com/fiat/otc/item/online?userId=&tokenId=USDT&currencyId=NGN&payment=&side=1&size=10&page=1&amount=',
     'BybitP2P',
-    { timeoutMs: 12_000, agent: proxy }
+    { timeoutMs: 12_000 }
   ) as { result: { items: Array<{ price: string }> } }
 
   const items = data.result?.items
@@ -381,26 +405,19 @@ export async function fetchNgnUsdtBybitP2P(proxy?: HttpsProxyAgent<string>): Pro
 }
 
 /**
- * Bitget P2P: NGN/USDT buy-side median from active sell ads.
- * Uses the v3 public ad-list endpoint which requires an ACCESS-KEY header.
- * Set BITGET_API_KEY in .env (free Bitget account, read-only key is sufficient).
- * If no key is provided this source will fail gracefully and be excluded from
- * aggregation -- the other three NGN/USDT sources maintain quorum.
+ * Bitget P2P: NGN/USDT buy-side median.
+ * Requires BITGET_API_KEY (free Bitget account). Skipped gracefully if not set.
  */
-export async function fetchNgnUsdtBitgetP2P(apiKey: string, proxy?: HttpsProxyAgent<string>): Promise<SourceResult> {
+export async function fetchNgnUsdtBitgetP2P(apiKey: string, cfWorkerUrl: string): Promise<SourceResult> {
   if (!apiKey) throw new Error('BitgetP2P: BITGET_API_KEY not set -- source skipped')
   await limiters['BitgetP2P'].acquire()
-  const data = await fetchJson(
+  const data = await cfFetch(
+    cfWorkerUrl,
     'https://api.bitget.com/api/v3/p2p/ad-list?token=USDT&fiat=NGN&side=sell&pageNum=1&limit=10',
     'BitgetP2P',
     {
       timeoutMs: 12_000,
-      headers: {
-        'ACCESS-KEY': apiKey,
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0',
-      },
-      agent: proxy,
+      headers: { 'ACCESS-KEY': apiKey },
     }
   ) as { data: Array<{ price: string }> }
 
@@ -420,7 +437,6 @@ export async function fetchNgnUsdtBitgetP2P(apiKey: string, proxy?: HttpsProxyAg
 // Aggregation helpers
 // ---------------------------------------------------------------------------
 
-/** Median of a numeric array. Works with odd or even lengths. */
 export function median(values: number[]): number {
   if (values.length === 0) throw new Error('Cannot take median of empty array')
   const sorted = [...values].sort((a, b) => a - b)
@@ -430,19 +446,13 @@ export function median(values: number[]): number {
     : ((sorted[mid - 1] + sorted[mid]) / 2)
 }
 
-/**
- * Outlier rejection via median-distance filter.
- * Per spec: any source deviating >10% from the group median is invalidated.
- * maxDeviationRatio defaults to 0.10 (10%).
- */
 export function rejectOutliers(
   results: SourceResult[],
   maxDeviationRatio = 0.10
 ): SourceResult[] {
-  if (results.length <= 1) return results  // cannot filter a single point
+  if (results.length <= 1) return results
   const med = median(results.map((r) => r.value))
   const clean = results.filter((r) => Math.abs(r.value - med) / med <= maxDeviationRatio)
-  // Log any rejected sources so the operator knows
   const rejected = results.filter((r) => Math.abs(r.value - med) / med > maxDeviationRatio)
   for (const r of rejected) {
     const pct = ((Math.abs(r.value - med) / med) * 100).toFixed(2)
@@ -451,18 +461,9 @@ export function rejectOutliers(
   return clean
 }
 
-/**
- * Fetch all sources for a leg in parallel, collecting successes and failures.
- * Returns { successes, failures }. A failure in one source never blocks others.
- *
- * Issue 3 fix: each fetcher is wrapped in a tagged object so the source name
- * is preserved even when the fetch rejects -- no more source: 'unknown'.
- */
 export async function fetchAll(
   fetchers: Array<() => Promise<SourceResult>>
 ): Promise<{ successes: SourceResult[]; failures: Array<{ source: string; error: string }> }> {
-  // Run all fetchers and tag each result with its index so we can identify failures.
-  // We wrap each fetcher so that on rejection we still get a named error.
   const tagged = fetchers.map((f) =>
     f().then(
       (result) => ({ ok: true as const, result }),
@@ -479,9 +480,7 @@ export async function fetchAll(
       successes.push(r.result)
     } else {
       const msg = r.reason instanceof Error ? r.reason.message : String(r.reason)
-      // Redact any URLs that may have slipped through (no API key leakage in logs)
       const safe = msg.replace(/https?:\/\/[^\s"']*/g, '[url-redacted]').slice(0, 200)
-      // Extract source name from the error message prefix (e.g. "BinanceP2P: no active ads")
       const colonIdx = safe.indexOf(':')
       const source = colonIdx > 0 && colonIdx < 30 ? safe.slice(0, colonIdx) : 'unknown'
       failures.push({ source, error: safe })
