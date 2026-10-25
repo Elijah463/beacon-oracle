@@ -1,10 +1,10 @@
-FROM oven/bun:1.1-alpine
+FROM oven/bun:1.2-alpine
 
 WORKDIR /app
 
-# Copy dependency files first for layer caching
-COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --production
+# Copy package.json first for layer caching
+COPY package.json ./
+RUN bun install --production
 
 # Copy source
 COPY scripts/ ./scripts/
