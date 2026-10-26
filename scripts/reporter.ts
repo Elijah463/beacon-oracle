@@ -348,6 +348,8 @@ async function refreshOnChainState(): Promise<void> {
     throw new Error(`circuitBreakerTripped read failed: ${safeMsg(e)}`)
   })
 
+  reporterState.circuitBreakerTripped = cbTripped
+
   if (cbTripped) {
     console.error('\n[BEACON ALERT] ====================================================')
     console.error('[BEACON ALERT] CIRCUIT BREAKER IS TRIPPED.')
@@ -377,6 +379,7 @@ async function refreshOnChainState(): Promise<void> {
     })
 
     firstRoundDone = roundId > 0n
+    reporterState.firstRoundDone = firstRoundDone
 
     if (firstRoundDone) {
       // getRoundData never enforces staleness -- safe to call even on a stale feed
@@ -577,6 +580,10 @@ console.log(`[BEACON] Quorum:           USDC/USD ${USDC_USD_QUORUM}/5 | NGN/USDT
 console.log(`[BEACON] Outlier filter:   10% max deviation from group median`)
 console.log('')
 
+// ---------------------------------------------------------------------------
+// Health server -- keeps Fly.io machine alive and provides status endpoint
+// ---------------------------------------------------------------------------
+startHealthServer()
 void loop()
 
 // ---------------------------------------------------------------------------
@@ -593,6 +600,59 @@ function safeMsg(e: unknown): string {
   return raw.replace(/https?:\/\/[^\s"']*/g, '[url-redacted]').slice(0, 400)
 }
 
-// Suppress unused variable warning for latestDerivedPrice
-// (it is tracked for future use in a status endpoint)
-void latestDerivedPrice
+// ---------------------------------------------------------------------------
+// Health server
+// ---------------------------------------------------------------------------
+
+/** Mutable reporter state exposed to the health endpoint. */
+const reporterState = {
+  circuitBreakerTripped: false,
+  firstRoundDone: false,
+}
+
+/**
+ * Starts a minimal HTTP server on port 8080 using Node's built-in http module.
+ * GET /health  -- liveness check (Fly.io health check target)
+ * GET /status  -- current reporter state as JSON
+ *
+ * Keeping this server alive prevents Fly from suspending the machine.
+ */
+function startHealthServer(): void {
+  const PORT = 8080
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const http = require('http') as typeof import('http')
+
+  http.createServer((req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
+    const path = new URL(req.url ?? '/', `http://localhost:${PORT}`).pathname
+
+    if (path === '/health') {
+      res.writeHead(200, { 'Content-Type': 'text/plain' })
+      res.end('ok')
+      return
+    }
+
+    if (path === '/status') {
+      const now = Math.floor(Date.now() / 1000)
+      const body = JSON.stringify({
+        status:              'running',
+        contract:            CONTRACT_ADDRESS,
+        latestPrice:         latestDerivedPrice > 0n
+                               ? (Number(latestDerivedPrice) / 1e8).toFixed(8)
+                               : null,
+        lastPublishedAt:     lastPublishedAt > 0 ? lastPublishedAt : null,
+        secondsSincePublish: lastPublishedAt > 0 ? now - lastPublishedAt : null,
+        circuitBreakerTripped: reporterState.circuitBreakerTripped,
+        firstRoundDone:      reporterState.firstRoundDone,
+        uptime:              now,
+      }, null, 2)
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(body)
+      return
+    }
+
+    res.writeHead(404)
+    res.end('not found')
+  }).listen(PORT, '0.0.0.0', () => {
+    console.log(`[BEACON] Health server:    http://0.0.0.0:${PORT}/health`)
+  })
+}

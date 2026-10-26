@@ -1,29 +1,37 @@
-# fly.toml app configuration file generated for beacon-oracle on 2026-10-25T22:13:07Z
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
-
-app = 'beacon-oracle'
-primary_region = 'lhr'
+app = "beacon-oracle-reporter"
+primary_region = "ams"
 
 [build]
 
 [env]
-  VITE_ORACLE_CONTRACT_ADDRESS = '0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797'
-
-[http_service]
-  internal_port = 8080
-  force_https = true
-  auto_stop_machines = 'stop'
-  auto_start_machines = true
-  min_machines_running = 0
-  processes = ['app']
-
-[[restart]]
-  policy = 'always'
+  PORT = "8080"
 
 [[vm]]
-  memory = '1gb'
-  cpu_kind = 'shared'
-  cpus = 1
-  memory_mb = 1024
+  size = "shared-cpu-1x"
+  memory = "256mb"
+
+[[services]]
+  internal_port = 8080
+  protocol      = "tcp"
+  auto_stop_machines  = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port     = 80
+    handlers = ["http"]
+
+  [[services.ports]]
+    port     = 443
+    handlers = ["tls", "http"]
+
+  [[services.http_checks]]
+    interval      = 30000
+    timeout       = 5000
+    grace_period  = "10s"
+    method        = "GET"
+    path          = "/health"
+    protocol      = "http"
+
+[[restart]]
+  policy = "always"
