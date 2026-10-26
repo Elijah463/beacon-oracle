@@ -84,17 +84,79 @@ const CF_WORKER_URL = process.env.CF_WORKER_URL ?? ''
 // cannot submit a forged price because they cannot produce a valid payload signature.
 const REPORTER_SIGNING_KEY = (process.env.REPORTER_SIGNING_KEY ?? '') as `0x${string}`
 
+// ---------------------------------------------------------------------------
+// Health server state + server (defined here so it can start before validation)
+// ---------------------------------------------------------------------------
 
+/** Mutable state exposed to the /status health endpoint. */
+const reporterState = {
+  circuitBreakerTripped: false,
+  firstRoundDone:        false,
+  startupError:          '' as string,
+}
 
-if (!CIRCLE_API_KEY)        { console.error('[BEACON] CIRCLE_API_KEY not set');        process.exit(1) }
-if (!CIRCLE_ENTITY_SECRET)  { console.error('[BEACON] CIRCLE_ENTITY_SECRET not set');  process.exit(1) }
-if (!REPORTER_WALLET_ID)    { console.error('[BEACON] REPORTER_WALLET_ID not set');     process.exit(1) }
-if (!CONTRACT_ADDRESS)      { console.error('[BEACON] VITE_ORACLE_CONTRACT_ADDRESS not set'); process.exit(1) }
-if (!REPORTER_SIGNING_KEY)  { console.error('[BEACON] REPORTER_SIGNING_KEY not set');   process.exit(1) }
+function startHealthServer(): void {
+  const PORT = 8080
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const http = require('http') as typeof import('http')
+  http.createServer((req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
+    const path = new URL(req.url ?? '/', `http://localhost:${PORT}`).pathname
+    if (path === '/health') {
+      res.writeHead(200, { 'Content-Type': 'text/plain' })
+      res.end(reporterState.startupError ? `error: ${reporterState.startupError}` : 'ok')
+      return
+    }
+    if (path === '/status') {
+      const now = Math.floor(Date.now() / 1000)
+      const body = JSON.stringify({
+        status:              reporterState.startupError ? 'misconfigured' : 'running',
+        startupError:        reporterState.startupError || null,
+        contract:            CONTRACT_ADDRESS || null,
+        latestPrice:         typeof latestDerivedPrice !== 'undefined' && latestDerivedPrice > 0n
+                               ? (Number(latestDerivedPrice) / 1e8).toFixed(8) : null,
+        lastPublishedAt:     typeof lastPublishedAt !== 'undefined' && lastPublishedAt > 0
+                               ? lastPublishedAt : null,
+        circuitBreakerTripped: reporterState.circuitBreakerTripped,
+        firstRoundDone:      reporterState.firstRoundDone,
+        uptime:              now,
+      }, null, 2)
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(body)
+      return
+    }
+    res.writeHead(404)
+    res.end('not found')
+  }).listen(PORT, '0.0.0.0', () => {
+    console.log(`[BEACON] Health server:    http://0.0.0.0:${PORT}/health`)
+  })
+}
+
+// Start health server immediately -- before any validation so Fly can always
+// reach /health even if the reporter is misconfigured.
+startHealthServer()
+
+const missingVars: string[] = []
+if (!CIRCLE_API_KEY)       missingVars.push('CIRCLE_API_KEY')
+if (!CIRCLE_ENTITY_SECRET) missingVars.push('CIRCLE_ENTITY_SECRET')
+if (!REPORTER_WALLET_ID)   missingVars.push('REPORTER_WALLET_ID')
+if (!CONTRACT_ADDRESS)     missingVars.push('VITE_ORACLE_CONTRACT_ADDRESS')
+if (!REPORTER_SIGNING_KEY) missingVars.push('REPORTER_SIGNING_KEY')
+if (missingVars.length > 0) {
+  const msg = `Missing required env vars: ${missingVars.join(', ')}`
+  console.error(`[BEACON] ${msg}`)
+  reporterState.startupError = msg
+  // Keep process alive so /health and /status remain reachable on Fly
+  // The reporter loop will not start. Fix the secrets and redeploy.
+}
 
 // Build the signing account from the signing key (sign-only, never broadcasts tx)
-const signingAccount = privateKeyToAccount(REPORTER_SIGNING_KEY)
-console.log(`[BEACON] Signing address:  ${signingAccount.address} (must match setReporter() on contract)`)
+// Only safe to call when REPORTER_SIGNING_KEY is a valid hex key
+const signingAccount = missingVars.length === 0
+  ? privateKeyToAccount(REPORTER_SIGNING_KEY)
+  : null
+if (signingAccount) {
+  console.log(`[BEACON] Signing address:  ${signingAccount.address} (must match setReporter() on contract)`)
+}
 
 if (CF_WORKER_URL) {
   console.log('[BEACON] CF Worker relay: configured -- P2P sources routed via Cloudflare Lagos edge')
@@ -464,7 +526,9 @@ async function transmitPrice(price: bigint, timestamp: bigint, nextRoundId: bigi
     )
   )
   // Sign with Ethereum prefix (matches contract's "\x19Ethereum Signed Message:\n32" prefix)
-  const signature = await signingAccount.signMessage({ message: { raw: payloadHash } })
+  // signingAccount is guaranteed non-null here -- transmitPrice is only called
+  // from loop() which is only started when missingVars.length === 0
+  const signature = await signingAccount!.signMessage({ message: { raw: payloadHash } })
 
   console.log(`[transmit] Payload signed. Submitting via Circle wallet ${REPORTER_WALLET_ID}...`)
 
@@ -580,11 +644,12 @@ console.log(`[BEACON] Quorum:           USDC/USD ${USDC_USD_QUORUM}/5 | NGN/USDT
 console.log(`[BEACON] Outlier filter:   10% max deviation from group median`)
 console.log('')
 
-// ---------------------------------------------------------------------------
-// Health server -- keeps Fly.io machine alive and provides status endpoint
-// ---------------------------------------------------------------------------
-startHealthServer()
-void loop()
+if (missingVars.length === 0) {
+  void loop()
+} else {
+  console.error('[BEACON] Reporter loop NOT started due to missing env vars above.')
+  console.error('[BEACON] Fix secrets on Fly.io and redeploy. Health server remains running.')
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -600,59 +665,4 @@ function safeMsg(e: unknown): string {
   return raw.replace(/https?:\/\/[^\s"']*/g, '[url-redacted]').slice(0, 400)
 }
 
-// ---------------------------------------------------------------------------
-// Health server
-// ---------------------------------------------------------------------------
-
-/** Mutable reporter state exposed to the health endpoint. */
-const reporterState = {
-  circuitBreakerTripped: false,
-  firstRoundDone: false,
-}
-
-/**
- * Starts a minimal HTTP server on port 8080 using Node's built-in http module.
- * GET /health  -- liveness check (Fly.io health check target)
- * GET /status  -- current reporter state as JSON
- *
- * Keeping this server alive prevents Fly from suspending the machine.
- */
-function startHealthServer(): void {
-  const PORT = 8080
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const http = require('http') as typeof import('http')
-
-  http.createServer((req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
-    const path = new URL(req.url ?? '/', `http://localhost:${PORT}`).pathname
-
-    if (path === '/health') {
-      res.writeHead(200, { 'Content-Type': 'text/plain' })
-      res.end('ok')
-      return
-    }
-
-    if (path === '/status') {
-      const now = Math.floor(Date.now() / 1000)
-      const body = JSON.stringify({
-        status:              'running',
-        contract:            CONTRACT_ADDRESS,
-        latestPrice:         latestDerivedPrice > 0n
-                               ? (Number(latestDerivedPrice) / 1e8).toFixed(8)
-                               : null,
-        lastPublishedAt:     lastPublishedAt > 0 ? lastPublishedAt : null,
-        secondsSincePublish: lastPublishedAt > 0 ? now - lastPublishedAt : null,
-        circuitBreakerTripped: reporterState.circuitBreakerTripped,
-        firstRoundDone:      reporterState.firstRoundDone,
-        uptime:              now,
-      }, null, 2)
-      res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(body)
-      return
-    }
-
-    res.writeHead(404)
-    res.end('not found')
-  }).listen(PORT, '0.0.0.0', () => {
-    console.log(`[BEACON] Health server:    http://0.0.0.0:${PORT}/health`)
-  })
-}
+// (health server and reporterState defined above, before startup validation)
