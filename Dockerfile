@@ -6,12 +6,15 @@ WORKDIR /app
 COPY package.json ./
 RUN bun install --production
 
-# Copy source
+# Copy source files needed by the reporter
 COPY scripts/ ./scripts/
 COPY src/onchain-facts.ts ./src/
 COPY src/onchain-money.ts ./src/
 COPY src/onchain-wait.ts ./src/
 COPY tsconfig.json ./
 
-# Run the reporter (no HTTP port -- pure background worker)
+# Expose health server port
+EXPOSE 8080
+
+# Run the reporter
 CMD ["bun", "run", "scripts/reporter.ts"]
