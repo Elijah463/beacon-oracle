@@ -1,0 +1,21 @@
+name: Deploy to Fly.io
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy reporter
+    runs-on: ubuntu-latest
+    concurrency: deploy-group
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Fly.io
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - run: flyctl deploy --remote-only --app beacon-oracle
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
