@@ -115,9 +115,15 @@ export function useOracle(): OracleState {
   const fetchHistory = useCallback(
     async (latestRoundId: bigint): Promise<RoundPoint[]> => {
       if (!publicClient || latestRoundId === 0n) return []
-      const start = latestRoundId > 19n ? latestRoundId - 19n : 1n
+      // Extract the aggregator counter from the lower 64 bits.
+      // latestRound() returns phaseId<<64 | counter. History IDs must be
+      // built as phaseId<<64 | n, not as raw integers from latestRoundId-19.
+      const PHASE_MASK  = BigInt('0xFFFFFFFFFFFFFFFF')
+      const phasePrefix = latestRoundId & ~PHASE_MASK          // upper bits (phaseId<<64)
+      const counter     = latestRoundId &  PHASE_MASK          // lower 64 bits
+      const startCount  = counter > 19n ? counter - 19n : 1n
       const ids: bigint[] = []
-      for (let i = start; i <= latestRoundId; i++) ids.push(i)
+      for (let i = startCount; i <= counter; i++) ids.push(phasePrefix | i)
 
       const calls = ids.map((id) => ({
         address: CONTRACT_ADDRESS,
@@ -132,8 +138,10 @@ export function useOracle(): OracleState {
         results.forEach((r, idx) => {
           if (r.status === 'success') {
             const [, answer, , updatedAt] = r.result as [bigint, bigint, bigint, bigint, bigint]
+            // Show aggregator counter (lower 64 bits), not the full encoded id
+            const displayId = Number(ids[idx] & BigInt('0xFFFFFFFFFFFFFFFF'))
             points.push({
-              roundId:   Number(ids[idx]),
+              roundId:   displayId,
               price:     Number(answer) / SCALE,
               updatedAt: Number(updatedAt),
             })
@@ -172,14 +180,17 @@ export function useOracle(): OracleState {
     const roundIdBig      = latestRound ?? 0n
     const maxStalenessNum = maxStaleness !== undefined ? Number(maxStaleness) : null
 
+    // Extract aggregator counter from lower 64 bits (phaseId lives in upper bits)
+    const aggregatorCounter = roundIdBig & BigInt('0xFFFFFFFFFFFFFFFF')
+
     if (isError) {
       const errMsg = (error as Error | null)?.message ?? 'Contract read failed'
       setState((prev) => ({ ...prev, loading: false, error: errMsg, hasData: false }))
       return
     }
 
-    if (roundIdBig === 0n) {
-      // Contract deployed but no rounds yet
+    if (aggregatorCounter === 0n) {
+      // Contract deployed but no rounds written yet
       setState((prev) => ({
         ...prev,
         loading:               false,
@@ -218,10 +229,12 @@ export function useOracle(): OracleState {
         const updatedAtNum  = Number(updatedAt)
         const priceNum      = Number(answer) / SCALE
         const stale         = maxStalenessNum !== null && (Math.floor(Date.now() / 1000) - updatedAtNum) > maxStalenessNum
+        // Display the aggregator counter, not the full phaseId-encoded roundId
+        const displayRoundId = Number(BigInt(rid) & BigInt('0xFFFFFFFFFFFFFFFF'))
 
         setState((prev) => ({
           price:                 priceNum,
-          roundId:               Number(rid),
+          roundId:               displayRoundId,
           updatedAt:             updatedAtNum,
           secondsAgo:            Math.floor(Date.now() / 1000) - updatedAtNum,
           isStale:               stale,
