@@ -1,272 +1,486 @@
 /**
  * LandingPage.tsx
- * BEACON -- on-chain oracle for USDC/NGN.
- * No framer-motion. Pure CSS transitions only.
+ * BEACON -- dark-mode oracle landing page.
+ * Background: animated orderbook numbers + floating data particles.
+ * Architecture section: animated SVG flow diagram.
+ * Hero: glossy 3D-style price orb.
+ * No framer-motion. Pure CSS + React.
  */
 
-import { ArrowRight, Shield, Zap, Clock, GitBranch, ExternalLink, ChevronRight } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowRight, Shield, Zap, Clock, GitBranch, ExternalLink, ChevronRight, BookOpen } from 'lucide-react'
 import { BeaconLogo } from './BeaconLogo'
 
 interface LandingPageProps {
   onEnterDashboard: () => void
+  onOpenDocs: () => void
 }
 
-const CONTRACT = '0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797'
-const EXPLORER = `https://explorer.testnet.arc.io/address/${CONTRACT}`
+const CONTRACT    = '0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797'
+const EXPLORER    = `https://explorer.testnet.arc.io/address/${CONTRACT}`
 const SHORT_CONTRACT = `${CONTRACT.slice(0, 8)}...${CONTRACT.slice(-6)}`
 
-export function LandingPage({ onEnterDashboard }: LandingPageProps) {
-  return (
-    <div style={{ background: '#F5F7FA', minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+// ── Orderbook background canvas ────────────────────────────────────────────
+function OrderbookCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
-      {/* ── Nav ───────────────────────────────────────────────── */}
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    let raf: number
+    let cols: { x: number; rows: { y: number; val: string; alpha: number; speed: number; color: string }[] }[] = []
+
+    const resize = () => {
+      canvas.width  = canvas.offsetWidth
+      canvas.height = canvas.offsetHeight
+      init()
+    }
+
+    const rand = (min: number, max: number) => Math.random() * (max - min) + min
+    const fmtPrice = () => (rand(1300, 1400)).toFixed(rand(0, 1) > 0.5 ? 2 : 4)
+    const fmtVol   = () => (rand(100, 99999)).toFixed(0)
+
+    const init = () => {
+      const colCount = Math.floor(canvas.width / 110)
+      cols = Array.from({ length: colCount }, (_, i) => ({
+        x: (i + 0.5) * (canvas.width / colCount),
+        rows: Array.from({ length: Math.floor(canvas.height / 22) }, (_, j) => ({
+          y: j * 22 + 14,
+          val: Math.random() > 0.5 ? fmtPrice() : fmtVol(),
+          alpha: rand(0.04, 0.18),
+          speed: rand(0.0005, 0.002),
+          color: Math.random() > 0.55 ? '#00D66F' : '#334155',
+        })),
+      }))
+    }
+
+    let t = 0
+    const draw = () => {
+      t += 1
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.font = '11px "JetBrains Mono", monospace'
+      ctx.textAlign = 'center'
+
+      for (const col of cols) {
+        for (const row of col.rows) {
+          const pulse = Math.sin(t * row.speed * 60 + row.y) * 0.5 + 0.5
+          ctx.globalAlpha = row.alpha * (0.5 + pulse * 0.5)
+          ctx.fillStyle   = row.color
+          ctx.fillText(row.val, col.x, row.y)
+          if (t % 120 === 0 && Math.random() > 0.85) {
+            row.val   = Math.random() > 0.5 ? fmtPrice() : fmtVol()
+            row.color = Math.random() > 0.55 ? '#00D66F' : '#334155'
+          }
+        }
+      }
+      ctx.globalAlpha = 1
+      raf = requestAnimationFrame(draw)
+    }
+
+    resize()
+    draw()
+    window.addEventListener('resize', resize)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', resize)
+    }
+  }, [])
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'absolute', inset: 0, width: '100%', height: '100%',
+        pointerEvents: 'none',
+      }}
+    />
+  )
+}
+
+// ── Animated architecture diagram ──────────────────────────────────────────
+function ArchDiagram() {
+  const [step, setStep] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(() => setStep(s => (s + 1) % 4), 1200)
+    return () => clearInterval(id)
+  }, [])
+
+  const nodes = [
+    { label: 'Market Sources', sub: '8 independent feeds', icon: '◎', col: '#60a5fa' },
+    { label: 'Aggregator', sub: 'Median + outlier filter', icon: '⬡', col: '#a78bfa' },
+    { label: 'ECDSA Signer', sub: 'Signing key verification', icon: '⬢', col: '#f472b6' },
+    { label: 'BEACON Contract', sub: 'On-chain round storage', icon: '◈', col: '#00D66F' },
+  ]
+
+  return (
+    <div style={{ width: '100%', overflowX: 'auto' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: 0, minWidth: 640, padding: '24px 0',
+      }}>
+        {nodes.map((node, i) => (
+          <div key={node.label} style={{ display: 'flex', alignItems: 'center' }}>
+            {/* Node */}
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              gap: 8, padding: '20px 24px',
+              background: step >= i
+                ? `linear-gradient(135deg, rgba(${hexToRgb(node.col)},0.12), rgba(${hexToRgb(node.col)},0.04))`
+                : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${step >= i ? node.col + '55' : 'rgba(255,255,255,0.07)'}`,
+              borderRadius: 16, width: 140, transition: 'all 0.4s ease',
+              boxShadow: step >= i ? `0 0 24px rgba(${hexToRgb(node.col)},0.15)` : 'none',
+            }}>
+              <span style={{ fontSize: 28, color: step >= i ? node.col : '#334155', transition: 'color 0.4s' }}>{node.icon}</span>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: step >= i ? '#f1f5f9' : '#475569', transition: 'color 0.4s', fontFamily: "'Space Grotesk', sans-serif" }}>
+                  {node.label}
+                </div>
+                <div style={{ fontSize: 11, color: step >= i ? '#94a3b8' : '#334155', marginTop: 3, transition: 'color 0.4s' }}>
+                  {node.sub}
+                </div>
+              </div>
+            </div>
+
+            {/* Arrow between nodes */}
+            {i < nodes.length - 1 && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 48, flexShrink: 0 }}>
+                <div style={{
+                  height: 2, width: '100%',
+                  background: step > i
+                    ? `linear-gradient(90deg, ${nodes[i].col}, ${nodes[i + 1].col})`
+                    : 'rgba(255,255,255,0.08)',
+                  transition: 'background 0.4s',
+                  position: 'relative',
+                }}>
+                  {/* Moving dot on active edge */}
+                  {step === i + 1 && (
+                    <div style={{
+                      position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+                      width: 8, height: 8, borderRadius: '50%',
+                      background: nodes[i].col, boxShadow: `0 0 8px ${nodes[i].col}`,
+                      animation: 'slideRight 1.2s linear',
+                    }} />
+                  )}
+                </div>
+                <div style={{ fontSize: 10, color: '#334155', marginTop: 4 }}>
+                  {step > i ? ['price data', 'signed payload', 'transmit()'][i] : ''}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <style>{`
+        @keyframes slideRight {
+          from { left: 0; }
+          to   { left: 100%; }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+function hexToRgb(hex: string) {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `${r},${g},${b}`
+}
+
+// ── 3D Glossy price orb ────────────────────────────────────────────────────
+function PriceOrb() {
+  return (
+    <div style={{ position: 'relative', width: 200, height: 200, margin: '0 auto 32px' }}>
+      {/* Outer glow */}
+      <div style={{
+        position: 'absolute', inset: -20,
+        background: 'radial-gradient(circle, rgba(0,214,111,0.18) 0%, transparent 70%)',
+        borderRadius: '50%',
+        animation: 'orbPulse 3s ease-in-out infinite',
+      }} />
+      {/* Orb body */}
+      <div style={{
+        width: 200, height: 200, borderRadius: '50%',
+        background: 'radial-gradient(circle at 38% 35%, rgba(0,214,111,0.35) 0%, rgba(0,214,111,0.1) 40%, rgba(0,30,15,0.9) 80%)',
+        border: '1px solid rgba(0,214,111,0.4)',
+        boxShadow: '0 0 60px rgba(0,214,111,0.2), 0 0 120px rgba(0,214,111,0.08), inset 0 1px 0 rgba(255,255,255,0.15)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        {/* Specular highlight */}
+        <div style={{
+          position: 'absolute', top: 18, left: 42, width: 60, height: 30,
+          background: 'radial-gradient(ellipse, rgba(255,255,255,0.18) 0%, transparent 70%)',
+          borderRadius: '50%', transform: 'rotate(-20deg)',
+        }} />
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', color: 'rgba(0,214,111,0.8)', textTransform: 'uppercase', marginBottom: 6 }}>
+          USDC / NGN
+        </div>
+        <div style={{
+          fontSize: 32, fontWeight: 800, color: '#fff',
+          fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.03em',
+          fontVariantNumeric: 'tabular-nums',
+        }}>
+          LIVE
+        </div>
+        <div style={{ width: 40, height: 2, background: 'rgba(0,214,111,0.5)', borderRadius: 1, margin: '6px 0' }} />
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.04em' }}>Arc Testnet</div>
+      </div>
+      {/* Orbiting ring */}
+      <div style={{
+        position: 'absolute', inset: -8,
+        border: '1px solid rgba(0,214,111,0.2)',
+        borderRadius: '50%',
+        animation: 'orbRing 8s linear infinite',
+      }}>
+        <div style={{
+          position: 'absolute', top: -4, left: '50%', transform: 'translateX(-50%)',
+          width: 8, height: 8, borderRadius: '50%',
+          background: '#00D66F', boxShadow: '0 0 8px #00D66F',
+        }} />
+      </div>
+      <style>{`
+        @keyframes orbPulse {
+          0%, 100% { opacity: 0.7; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.05); }
+        }
+        @keyframes orbRing {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
+export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) {
+  return (
+    <div style={{ background: '#060a12', minHeight: '100dvh', display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif", color: '#f1f5f9' }}>
+
+      {/* Nav */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 40,
-        background: 'rgba(245,247,250,0.92)', backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid #e8eaf0',
+        background: 'rgba(6,10,18,0.88)', backdropFilter: 'blur(16px)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <BeaconLogo size={32} />
-          <nav style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <a href={EXPLORER} target="_blank" rel="noreferrer" style={navLinkStyle}>
-              Contract <ExternalLink size={12} style={{ display: 'inline', marginLeft: 2 }} />
+          <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button onClick={onOpenDocs} style={navBtn}>
+              <BookOpen size={14} /> Docs
+            </button>
+            <a href={EXPLORER} target="_blank" rel="noreferrer" style={navLink}>
+              Contract <ExternalLink size={11} />
             </a>
-            <a href="https://developers.circle.com" target="_blank" rel="noreferrer" style={navLinkStyle}>
-              Docs
-            </a>
-            <button onClick={onEnterDashboard} style={ctaButtonStyle}>
-              Open Dashboard <ChevronRight size={15} />
+            <button onClick={onEnterDashboard} style={ctaBtn}>
+              Dashboard <ChevronRight size={14} />
             </button>
           </nav>
         </div>
       </header>
 
-      {/* ── Hero ──────────────────────────────────────────────── */}
-      <section style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '80px 24px 64px' }}>
+      {/* Hero */}
+      <section style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '80px 24px 72px', overflow: 'hidden' }}>
+        <OrderbookCanvas />
 
-        {/* Badge */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#e8faf2', border: '1px solid #b3f0d0', borderRadius: 999, padding: '4px 14px', marginBottom: 32 }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00D66F', display: 'inline-block' }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#00a855', letterSpacing: '0.03em' }}>Live on Arc Testnet</span>
+        {/* Radial vignette over canvas */}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'radial-gradient(ellipse 70% 80% at 50% 50%, rgba(6,10,18,0.25) 0%, rgba(6,10,18,0.88) 80%)',
+        }} />
+
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: 720 }}>
+          {/* Live badge */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(0,214,111,0.1)', border: '1px solid rgba(0,214,111,0.3)', borderRadius: 999, padding: '5px 16px', marginBottom: 40 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00D66F', display: 'inline-block', boxShadow: '0 0 6px #00D66F', animation: 'blink 2s ease-in-out infinite' }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#00D66F', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Live on Arc Testnet</span>
+          </div>
+
+          <PriceOrb />
+
+          <h1 style={{ fontSize: 'clamp(34px,5.5vw,68px)', fontWeight: 900, lineHeight: 1.06, letterSpacing: '-0.03em', color: '#fff', marginBottom: 20, fontFamily: "'Space Grotesk', sans-serif" }}>
+            The on-chain price oracle{' '}
+            <br />
+            <span style={{ color: '#00D66F' }}>for USDC/NGN</span>
+          </h1>
+
+          <p style={{ fontSize: 17, lineHeight: 1.7, color: '#64748b', maxWidth: 560, margin: '0 auto 40px' }}>
+            BEACON aggregates real-time exchange rate data across eight independent market sources,
+            derives a tamper-resistant USDC/NGN price, and publishes it on-chain via a
+            Chainlink-compatible interface. Any smart contract can read it.
+          </p>
+
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button onClick={onEnterDashboard} style={{ ...ctaBtn, padding: '13px 28px', fontSize: 15, gap: 8 }}>
+              View Live Price <ArrowRight size={16} />
+            </button>
+            <button onClick={onOpenDocs} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '13px 26px', borderRadius: 10, border: '1.5px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#e2e8f0', fontSize: 15, fontWeight: 500, cursor: 'pointer' }}>
+              <BookOpen size={16} /> Get Started
+            </button>
+          </div>
+
+          {/* Stats strip */}
+          <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap', justifyContent: 'center', marginTop: 60, paddingTop: 36, borderTop: '1px solid rgba(255,255,255,0.07)', width: '100%' }}>
+            {[
+              { value: '8', label: 'Decimal precision' },
+              { value: '0.2%', label: 'Deviation threshold' },
+              { value: '1h', label: 'Heartbeat' },
+              { value: 'UUPS', label: 'Upgradeable proxy' },
+            ].map(({ value, label }) => (
+              <div key={label} style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 26, fontWeight: 800, color: '#fff', fontFamily: "'Space Grotesk', sans-serif" }}>{value}</div>
+                <div style={{ fontSize: 12, color: '#475569', marginTop: 3, letterSpacing: '0.03em' }}>{label}</div>
+              </div>
+            ))}
+          </div>
         </div>
+        <style>{`.blink { animation: blink 2s ease-in-out infinite; } @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
+      </section>
 
-        <h1 style={{ fontSize: 'clamp(36px, 6vw, 72px)', fontWeight: 800, lineHeight: 1.08, letterSpacing: '-0.03em', color: '#0a0a0a', maxWidth: 800, margin: '0 auto 24px', fontFamily: "'Space Grotesk', sans-serif" }}>
-          The on-chain price oracle for{' '}
-          <span style={{ color: '#00D66F' }}>USDC/NGN</span>
-        </h1>
-
-        <p style={{ fontSize: 18, lineHeight: 1.65, color: '#5a6275', maxWidth: 600, margin: '0 auto 40px' }}>
-          BEACON aggregates real-time exchange rate data across independent sources,
-          derives a tamper-resistant USDC/NGN price, and publishes it on-chain
-          via a Chainlink-compatible interface. Any smart contract can read it.
-        </p>
-
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button onClick={onEnterDashboard} style={{ ...ctaButtonStyle, padding: '13px 28px', fontSize: 16, gap: 8 }}>
-            View Live Price <ArrowRight size={17} />
-          </button>
-          <a href={EXPLORER} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '13px 24px', borderRadius: 10, border: '1.5px solid #d1d5e0', background: 'white', color: '#3a3f4d', fontSize: 16, fontWeight: 500, textDecoration: 'none', transition: 'border-color .15s' }}>
-            {SHORT_CONTRACT} <ExternalLink size={14} />
-          </a>
+      {/* Architecture section */}
+      <section style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '80px 24px' }}>
+        <div style={{ maxWidth: 1040, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: '#00D66F', textTransform: 'uppercase', marginBottom: 10 }}>Architecture</p>
+            <h2 style={{ fontSize: 'clamp(22px,3.5vw,38px)', fontWeight: 800, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.02em', margin: 0 }}>
+              Two layers. One trusted price.
+            </h2>
+            <p style={{ color: '#475569', fontSize: 14, marginTop: 12 }}>
+              Watch how a price moves from raw market data to an on-chain round.
+            </p>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, padding: '32px 20px' }}>
+            <ArchDiagram />
+          </div>
         </div>
+      </section>
 
-        {/* Stats strip */}
-        <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', justifyContent: 'center', marginTop: 56, paddingTop: 40, borderTop: '1px solid #e0e3eb', width: '100%', maxWidth: 720 }}>
+      {/* Feature cards */}
+      <section style={{ padding: '0 24px 80px' }}>
+        <div style={{ maxWidth: 1040, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px,1fr))', gap: 16 }}>
           {[
-            { value: '8', label: 'Decimal precision' },
-            { value: '100', label: 'Rounds in history' },
-            { value: '0.2%', label: 'Deviation threshold' },
-            { value: 'UUPS', label: 'Upgradeable proxy' },
-          ].map(({ value, label }) => (
-            <div key={label} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 28, fontWeight: 800, color: '#0a0a0a', fontFamily: "'Space Grotesk', sans-serif" }}>{value}</div>
-              <div style={{ fontSize: 13, color: '#8891a4', marginTop: 2 }}>{label}</div>
+            {
+              icon: <Zap size={20} color="#00D66F" />,
+              title: 'Off-chain aggregation',
+              body: 'Eight independent market sources are sampled every cycle. Outliers are rejected before median aggregation. Both price legs (USDC/USD and USD/NGN) require quorum to proceed.',
+              bullets: ['Outlier rejection', '0.2% deviation gate', '1h heartbeat publish', 'Quorum required on both legs'],
+            },
+            {
+              icon: <Shield size={20} color="#818cf8" />,
+              title: 'On-chain settlement',
+              body: 'Prices are ECDSA-signed and submitted to the contract. The contract verifies signatures, enforces monotonic ordering, and stores rounds in a circular buffer.',
+              bullets: ['ECDSA signature verification', '100-round history buffer', 'Staleness guard on reads', 'On-chain circuit breaker'],
+            },
+            {
+              icon: <GitBranch size={20} color="#f472b6" />,
+              title: 'Chainlink-compatible',
+              body: 'Implements the full AggregatorV3Interface. Existing Chainlink consumers work without modification. Phase-encoded round IDs are compatible with the Chainlink Feed Registry.',
+              bullets: ['AggregatorV3Interface', 'latestRoundData() + getRoundData()', 'typeAndVersion() identifier', 'Phase-encoded round IDs'],
+            },
+            {
+              icon: <Clock size={20} color="#fbbf24" />,
+              title: 'Security model',
+              body: 'Ownable2Step governance prevents accidental ownership transfers. renounceOwnership is permanently disabled. The reporter role is separate from the gas payer.',
+              bullets: ['Ownable2Step (2-tx transfer)', 'UUPS upgradeable proxy', 'Consumer authorization gate', 'Pause / circuit breaker'],
+            },
+          ].map(({ icon, title, body, bullets }) => (
+            <div key={title} style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '26px 24px', transition: 'border-color .2s' }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                {icon}
+              </div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9', marginBottom: 10, fontFamily: "'Space Grotesk', sans-serif" }}>{title}</h3>
+              <p style={{ fontSize: 13.5, color: '#64748b', lineHeight: 1.65, marginBottom: 14 }}>{body}</p>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {bullets.map(b => (
+                  <li key={b} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#475569' }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#00D66F', flexShrink: 0 }} />
+                    {b}
+                  </li>
+                ))}
+              </ul>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── How it works ──────────────────────────────────────── */}
-      <section style={{ background: 'white', borderTop: '1px solid #e8eaf0', borderBottom: '1px solid #e8eaf0', padding: '72px 24px' }}>
-        <div style={{ maxWidth: 1040, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 52 }}>
-            <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', color: '#00D66F', textTransform: 'uppercase', marginBottom: 12 }}>Architecture</p>
-            <h2 style={{ fontSize: 'clamp(24px, 4vw, 40px)', fontWeight: 800, color: '#0a0a0a', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.02em', margin: 0 }}>
-              Two layers. One trusted price.
-            </h2>
+      {/* CTA strip */}
+      <section style={{ padding: '0 24px 80px', textAlign: 'center' }}>
+        <div style={{ maxWidth: 600, margin: '0 auto', background: 'rgba(0,214,111,0.04)', border: '1px solid rgba(0,214,111,0.15)', borderRadius: 24, padding: '56px 40px' }}>
+          <div style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(0,214,111,0.1)', border: '1px solid rgba(0,214,111,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+            <BookOpen size={24} color="#00D66F" />
           </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
-            {/* Off-chain */}
-            <div style={featureCardStyle}>
-              <div style={{ ...iconWrapStyle, background: '#f0faf6' }}>
-                <Zap size={20} color="#00D66F" />
-              </div>
-              <h3 style={cardTitleStyle}>Off-chain aggregation</h3>
-              <p style={cardBodyStyle}>
-                A reporter service fetches USDC/USD quotes from five independent
-                CEX spot markets and USD/NGN rates from three independent sources:
-                CoinGecko (real-time USDT/NGN crypto market rate), ExchangeRate-API,
-                and CurrencyAPI. Each leg is aggregated independently and the final
-                USDC/NGN price is median(USDC/USD) multiplied by median(NGN/USD).
-              </p>
-              <ul style={listStyle}>
-                <li>5 USDC/USD sources (Coinbase, Binance, OKX, Bitget, Bybit)</li>
-                <li>3 NGN/USD sources, quorum 2, outlier-filtered</li>
-                <li>FX sources cached (24h / 1h) to stay within free tier limits</li>
-                <li>0.2% deviation gate + 1h heartbeat publish rules</li>
-              </ul>
-            </div>
-
-            {/* On-chain */}
-            <div style={featureCardStyle}>
-              <div style={{ ...iconWrapStyle, background: '#f0faf6' }}>
-                <Shield size={20} color="#00D66F" />
-              </div>
-              <h3 style={cardTitleStyle}>On-chain settlement</h3>
-              <p style={cardBodyStyle}>
-                Aggregated prices are submitted to the oracle contract via a
-                permissioned <code style={codeStyle}>transmit()</code> call.
-                The contract stores rounds in a 100-slot circular buffer and
-                exposes a Chainlink-compatible <code style={codeStyle}>AggregatorV3Interface</code>,
-                so any existing Chainlink consumer integration works without
-                modification.
-              </p>
-              <ul style={listStyle}>
-                <li>Staleness guard reverts reads older than 1 hour</li>
-                <li>On-chain circuit breaker freezes updates on large single moves</li>
-                <li>Strict timestamp ordering per round</li>
-                <li>UUPS proxy -- logic upgradeable without address change</li>
-              </ul>
-            </div>
-
-            {/* Quotes */}
-            <div style={featureCardStyle}>
-              <div style={{ ...iconWrapStyle, background: '#f0faf6' }}>
-                <GitBranch size={20} color="#00D66F" />
-              </div>
-              <h3 style={cardTitleStyle}>On-chain quote functions</h3>
-              <p style={cardBodyStyle}>
-                External contracts can request computed conversions directly
-                without implementing any arithmetic. The oracle handles decimal
-                scaling, staleness validation, and circuit breaker checks before
-                returning the result.
-              </p>
-              <ul style={listStyle}>
-                <li><code style={codeStyle}>quoteUSDCToNGN(usdcAmount)</code></li>
-                <li><code style={codeStyle}>quoteNGNToUSDC(ngnAmount)</code></li>
-                <li><code style={codeStyle}>latestQuoteMetadata()</code> for auditability</li>
-                <li>6-decimal USDC in, 2-decimal NGN out (kobo precision)</li>
-              </ul>
-            </div>
-
-            {/* Security */}
-            <div style={featureCardStyle}>
-              <div style={{ ...iconWrapStyle, background: '#f0faf6' }}>
-                <Clock size={20} color="#00D66F" />
-              </div>
-              <h3 style={cardTitleStyle}>Security model</h3>
-              <p style={cardBodyStyle}>
-                BEACON follows the Chainlink security model adapted for a single
-                trusted reporter. The reporter role is an address stored in
-                contract state -- it can be replaced by the owner with a
-                coordinator contract to transition to a decentralized multi-node
-                model without redeploying the oracle.
-              </p>
-              <ul style={listStyle}>
-                <li>Ownable2Step -- two-step ownership transfer</li>
-                <li><code style={codeStyle}>renounceOwnership()</code> permanently disabled</li>
-                <li>Consumer authorization gate (optional)</li>
-                <li>Pause / unpause by owner for emergency stop</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── CTA strip ─────────────────────────────────────────── */}
-      <section style={{ padding: '64px 24px', textAlign: 'center' }}>
-        <div style={{ maxWidth: 560, margin: '0 auto' }}>
-          <h2 style={{ fontSize: 'clamp(22px, 3.5vw, 34px)', fontWeight: 800, color: '#0a0a0a', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.02em', marginBottom: 16 }}>
+          <h2 style={{ fontSize: 'clamp(20px,3vw,30px)', fontWeight: 800, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.02em', marginBottom: 12 }}>
             Ready to integrate?
           </h2>
-          <p style={{ color: '#5a6275', fontSize: 16, marginBottom: 32, lineHeight: 1.6 }}>
-            The contract is live. Read the on-chain price directly,
-            call the quote functions from your own contract, or plug
-            in any Chainlink-compatible consumer.
+          <p style={{ color: '#64748b', fontSize: 15, marginBottom: 32, lineHeight: 1.65 }}>
+            Read the full integration guide with verified code snippets, interface definitions,
+            security notes, and best practices for building on top of BEACON.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button onClick={onEnterDashboard} style={{ ...ctaButtonStyle, padding: '12px 26px' }}>
-              Open Dashboard <ArrowRight size={16} />
+            <button onClick={onOpenDocs} style={{ ...ctaBtn, padding: '12px 26px', fontSize: 15 }}>
+              Read the Docs <BookOpen size={15} />
             </button>
-            <a href={EXPLORER} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '12px 22px', borderRadius: 10, border: '1.5px solid #d1d5e0', background: 'white', color: '#3a3f4d', fontSize: 15, fontWeight: 500, textDecoration: 'none' }}>
-              View contract <ExternalLink size={14} />
-            </a>
+            <button onClick={onEnterDashboard} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '12px 24px', borderRadius: 10, border: '1.5px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#94a3b8', fontSize: 15, fontWeight: 500, cursor: 'pointer' }}>
+              Open Dashboard <ArrowRight size={15} />
+            </button>
           </div>
         </div>
       </section>
 
-      {/* ── Footer ────────────────────────────────────────────── */}
-      <LandingFooter onEnterDashboard={onEnterDashboard} />
+      {/* Footer */}
+      <LandingFooter onEnterDashboard={onEnterDashboard} onOpenDocs={onOpenDocs} />
     </div>
   )
 }
 
 const CURRENT_YEAR = new Date().getFullYear()
 
-export function LandingFooter({ onEnterDashboard }: { onEnterDashboard?: () => void }) {
+export function LandingFooter({ onEnterDashboard, onOpenDocs }: { onEnterDashboard?: () => void; onOpenDocs?: () => void }) {
   return (
-    <footer style={{ borderTop: '1px solid #e0e3eb', background: 'white', padding: '48px 24px 28px' }}>
+    <footer style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: '#040710', padding: '48px 24px 28px' }}>
       <div style={{ maxWidth: 1040, margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 40, marginBottom: 40 }}>
-          {/* Brand */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 40, marginBottom: 40 }}>
           <div>
-            <BeaconLogo size={30} />
-            <p style={{ marginTop: 12, fontSize: 13.5, color: '#8891a4', lineHeight: 1.6, maxWidth: 200 }}>
+            <BeaconLogo size={28} />
+            <p style={{ marginTop: 12, fontSize: 13, color: '#334155', lineHeight: 1.65, maxWidth: 200 }}>
               A USDC/NGN on-chain price oracle built on Arc. Chainlink-compatible. Upgradeable.
             </p>
           </div>
-          {/* Product */}
           <div>
-            <p style={footerHeadStyle}>Product</p>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              <li><button onClick={onEnterDashboard} style={footerLinkStyle}>Dashboard</button></li>
-              <li><a href={EXPLORER} target="_blank" rel="noreferrer" style={footerLinkStyle}>Contract</a></li>
-              <li><a href={`${EXPLORER}#readContract`} target="_blank" rel="noreferrer" style={footerLinkStyle}>ABI Reference</a></li>
+            <p style={footerHead}>Product</p>
+            <ul style={footerList}>
+              <li><button onClick={onEnterDashboard} style={footerLinkBtn}>Dashboard</button></li>
+              <li><a href={EXPLORER} target="_blank" rel="noreferrer" style={footerLink}>Contract</a></li>
+              <li><button onClick={onOpenDocs} style={footerLinkBtn}>Documentation</button></li>
             </ul>
           </div>
-          {/* Developers */}
           <div>
-            <p style={footerHeadStyle}>Developers</p>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              <li><a href="https://developers.circle.com" target="_blank" rel="noreferrer" style={footerLinkStyle}>Circle Docs</a></li>
-              <li><a href="https://docs.arc.io" target="_blank" rel="noreferrer" style={footerLinkStyle}>Arc Network</a></li>
-              <li><a href="https://docs.chain.link/data-feeds" target="_blank" rel="noreferrer" style={footerLinkStyle}>Chainlink Interface</a></li>
+            <p style={footerHead}>Developers</p>
+            <ul style={footerList}>
+              <li><a href="https://developers.circle.com" target="_blank" rel="noreferrer" style={footerLink}>Circle Docs</a></li>
+              <li><a href="https://docs.arc.io" target="_blank" rel="noreferrer" style={footerLink}>Arc Network</a></li>
+              <li><a href="https://docs.chain.link/data-feeds" target="_blank" rel="noreferrer" style={footerLink}>Chainlink Interface</a></li>
             </ul>
           </div>
-          {/* Network */}
           <div>
-            <p style={footerHeadStyle}>Network</p>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              <li>
-                <a href={`https://explorer.testnet.arc.io`} target="_blank" rel="noreferrer" style={footerLinkStyle}>
-                  Arc Testnet Explorer
-                </a>
-              </li>
-              <li>
-                <a href={EXPLORER} target="_blank" rel="noreferrer" style={footerLinkStyle}>
-                  {SHORT_CONTRACT}
-                </a>
-              </li>
+            <p style={footerHead}>Network</p>
+            <ul style={footerList}>
+              <li><a href="https://explorer.testnet.arc.io" target="_blank" rel="noreferrer" style={footerLink}>Arc Testnet Explorer</a></li>
+              <li><a href={EXPLORER} target="_blank" rel="noreferrer" style={footerLink}>{SHORT_CONTRACT}</a></li>
             </ul>
           </div>
         </div>
-        {/* Bottom bar */}
-        <div style={{ borderTop: '1px solid #eaecf0', paddingTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <span style={{ fontSize: 13, color: '#a0a8b8' }}>&copy; {CURRENT_YEAR} BEACON. Built on Arc by Circle.</span>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <span style={{ fontSize: 12, color: '#1e293b' }}>&copy; {CURRENT_YEAR} BEACON. Built on Arc by Circle.</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00D66F', display: 'inline-block' }} />
-            <span style={{ fontSize: 12, color: '#a0a8b8' }}>Arc Testnet</span>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00D66F', display: 'inline-block' }} />
+            <span style={{ fontSize: 12, color: '#334155' }}>Arc Testnet</span>
           </div>
         </div>
       </div>
@@ -274,62 +488,46 @@ export function LandingFooter({ onEnterDashboard }: { onEnterDashboard?: () => v
   )
 }
 
-// ── Shared styles ──────────────────────────────────────────
-const navLinkStyle: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 3,
-  fontSize: 14, fontWeight: 500, color: '#5a6275',
-  textDecoration: 'none', padding: '6px 10px', borderRadius: 7,
-  transition: 'color .15s',
+// ── Styles ─────────────────────────────────────────────────────────────────
+const navBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 5,
+  fontSize: 13.5, fontWeight: 500, color: '#64748b',
+  background: 'none', border: 'none', cursor: 'pointer',
+  padding: '6px 10px', borderRadius: 7, transition: 'color .15s',
+  fontFamily: "'DM Sans', sans-serif",
 }
 
-const ctaButtonStyle: React.CSSProperties = {
+const navLink: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4,
+  fontSize: 13.5, fontWeight: 500, color: '#64748b',
+  textDecoration: 'none', padding: '6px 10px', borderRadius: 7,
+}
+
+const ctaBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
   padding: '9px 18px', borderRadius: 10,
-  background: '#00D66F', color: 'white',
+  background: '#00D66F', color: '#031a0a',
   border: 'none', cursor: 'pointer',
-  fontSize: 14, fontWeight: 600,
-  transition: 'opacity .15s',
+  fontSize: 13.5, fontWeight: 700,
+  transition: 'opacity .15s', fontFamily: "'DM Sans', sans-serif",
 }
 
-const featureCardStyle: React.CSSProperties = {
-  background: '#fafbfc', border: '1px solid #e8eaf0',
-  borderRadius: 16, padding: '28px 26px',
+const footerHead: React.CSSProperties = {
+  fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+  textTransform: 'uppercase', color: '#1e293b', marginBottom: 12,
 }
 
-const iconWrapStyle: React.CSSProperties = {
-  width: 44, height: 44, borderRadius: 12,
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  marginBottom: 16,
-}
-
-const cardTitleStyle: React.CSSProperties = {
-  fontSize: 17, fontWeight: 700, color: '#0a0a0a',
-  marginBottom: 10, fontFamily: "'Space Grotesk', sans-serif",
-}
-
-const cardBodyStyle: React.CSSProperties = {
-  fontSize: 14.5, color: '#5a6275', lineHeight: 1.65, marginBottom: 14,
-}
-
-const listStyle: React.CSSProperties = {
+const footerList: React.CSSProperties = {
   listStyle: 'none', padding: 0, margin: 0,
-  display: 'flex', flexDirection: 'column', gap: 6,
 }
 
-const codeStyle: React.CSSProperties = {
-  fontFamily: "'JetBrains Mono', monospace",
-  fontSize: 12.5, background: '#f0f2f5',
-  padding: '1px 5px', borderRadius: 4, color: '#1a7a4a',
-}
-
-const footerHeadStyle: React.CSSProperties = {
-  fontSize: 12, fontWeight: 700, letterSpacing: '0.08em',
-  textTransform: 'uppercase', color: '#b0b8c8', marginBottom: 12,
-}
-
-const footerLinkStyle: React.CSSProperties = {
-  display: 'block', fontSize: 14, color: '#5a6275',
+const footerLink: React.CSSProperties = {
+  display: 'block', fontSize: 13.5, color: '#334155',
   textDecoration: 'none', padding: '4px 0',
+}
+
+const footerLinkBtn: React.CSSProperties = {
+  display: 'block', fontSize: 13.5, color: '#334155',
   background: 'none', border: 'none', cursor: 'pointer',
-  fontFamily: 'inherit',
+  padding: '4px 0', fontFamily: 'inherit', textAlign: 'left',
 }

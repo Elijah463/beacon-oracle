@@ -1,67 +1,51 @@
 /**
  * useOracle.ts
- * Polls the deployed USDCNGNOracle contract every 15 seconds for:
- *  - latestRound id + governance config (via useReadContracts, 15s refetchInterval)
- *  - current price via getRoundData(latestRoundId) -- FINDING 10: never latestRoundData()
- *    so a stale price shows a badge instead of blanking the dashboard
- *  - last 20 historical round data points for the chart
+ * Reads the deployed USDCNGNOracle proxy every 15 seconds using direct
+ * publicClient.readContract calls -- no multicall, no wagmi useReadContracts.
+ * Arc Testnet's Multicall3 deployment reverts, so every batched call must be
+ * replaced with individual eth_call requests.
  *
- * FINDING 9 FIX: history refetches only when latestRoundId changes, not every second.
- *               The 1-second clock only updates derived text (secondsAgo, isStale).
- * FINDING 10 FIX: uses getRoundData(id) -- no staleness revert from the contract.
- * FINDING 9 FIX: duplicate setInterval poll removed (useReadContracts refetchInterval handles it).
+ * PhaseId encoding: latestRound() returns (phaseId << 64) | aggregatorCounter.
+ * All round-ID arithmetic uses the lower 64 bits for the human-visible counter
+ * and reconstructs full encoded IDs as (phasePrefix | n) for contract calls.
  */
 
-import { useReadContracts, usePublicClient } from 'wagmi'
+import { usePublicClient } from 'wagmi'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { arcTestnet } from 'viem/chains'
 import { ORACLE_ABI } from '@/lib/oracleAbi'
 
-const CONTRACT_ADDRESS = import.meta.env.VITE_ORACLE_CONTRACT_ADDRESS as `0x${string}`
-const ORACLE_DECIMALS  = 8
-const SCALE            = 10 ** ORACLE_DECIMALS
-const POLL_INTERVAL_MS = 15_000
+const CONTRACT_ADDRESS  = import.meta.env.VITE_ORACLE_CONTRACT_ADDRESS as `0x${string}`
+const ORACLE_DECIMALS   = 8
+const SCALE             = 10 ** ORACLE_DECIMALS
+const POLL_INTERVAL_MS  = 15_000
+const PHASE_MASK        = BigInt('0xFFFFFFFFFFFFFFFF')
 
 export interface RoundPoint {
-  roundId:   number
-  price:     number   // human-readable (e.g. 1624.5)
+  roundId:   number   // human counter (lower 64 bits of encoded id)
+  price:     number   // human-readable NGN per USDC
   updatedAt: number   // unix seconds
 }
 
 export interface OracleState {
-  /** Current USDC/NGN price (human-readable, 2 decimal places) */
-  price: number | null
-  /** Current round id */
-  roundId: number | null
-  /** Unix seconds of last update */
-  updatedAt: number | null
-  /** Seconds since last update */
-  secondsAgo: number | null
-  /** Whether the price is considered stale (computed locally, not from contract revert) */
-  isStale: boolean
-  /** Whether the circuit breaker is tripped */
+  price:                 number | null
+  roundId:               number | null
+  updatedAt:             number | null
+  secondsAgo:            number | null
+  isStale:               boolean
   circuitBreakerTripped: boolean
-  /** Whether the contract is paused */
-  paused: boolean
-  /** Max staleness in seconds (from contract) */
-  maxStaleness: number | null
-  /** Deviation threshold in bps (from contract) */
+  paused:                boolean
+  maxStaleness:          number | null
   deviationThresholdBps: number | null
-  /** Circuit breaker threshold in bps (from contract) */
-  circuitBreakerBps: number | null
-  /** Reporter address */
-  reporter: string | null
-  /** Last 20 historical round data points for the chart */
-  history: RoundPoint[]
-  /** Whether any price data has been received */
-  hasData: boolean
-  /** Error from the latest read */
-  error: string | null
-  /** True while the first fetch is in flight */
-  loading: boolean
+  circuitBreakerBps:     number | null
+  reporter:              string | null
+  history:               RoundPoint[]
+  hasData:               boolean
+  error:                 string | null
+  loading:               boolean
 }
 
-const EMPTY_STATE: OracleState = {
+const EMPTY: OracleState = {
   price:                 null,
   roundId:               null,
   updatedAt:             null,
@@ -79,191 +63,31 @@ const EMPTY_STATE: OracleState = {
   loading:               true,
 }
 
-// Typed contract call descriptors for useReadContracts
-const CONTRACTS = [
-  { address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'latestRound'          } as const,
-  { address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'circuitBreakerTripped'} as const,
-  { address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'paused'               } as const,
-  { address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'maxStaleness'         } as const,
-  { address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'deviationThresholdBps'} as const,
-  { address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'circuitBreakerBps'    } as const,
-  { address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'reporter'             } as const,
-] as const
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyClient = { readContract: (opts: any) => Promise<any> }
+
+function read<T>(client: AnyClient, functionName: string, args?: unknown[]): Promise<T> {
+  return client.readContract({
+    address:      CONTRACT_ADDRESS,
+    abi:          ORACLE_ABI,
+    functionName,
+    args:         args ?? [],
+  }) as Promise<T>
+}
 
 export function useOracle(): OracleState {
-  const [state, setState]   = useState<OracleState>(EMPTY_STATE)
-  const [now, setNow]       = useState(() => Math.floor(Date.now() / 1000))
-  const publicClient        = usePublicClient({ chainId: arcTestnet.id })
+  const [state, setState]     = useState<OracleState>(EMPTY)
+  const [now, setNow]         = useState(() => Math.floor(Date.now() / 1000))
+  const publicClient          = usePublicClient({ chainId: arcTestnet.id })
+  const lastHistoryRound      = useRef<bigint | null>(null)
+  const isFetchingRef         = useRef(false)
 
-  // Tracks the last roundId for which history was fetched -- avoids redundant fetches
-  const lastHistoryRound = useRef<bigint | null>(null)
-
-  // Tick "now" every second -- ONLY for live "X seconds ago" display, not for chain refetch
+  // Tick secondsAgo every second -- no chain call
   useEffect(() => {
     const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1_000)
     return () => clearInterval(id)
   }, [])
 
-  // Poll governance + latest round id every 15 seconds via wagmi
-  // useReadContracts refetchInterval handles the polling -- no duplicate setInterval needed
-  const { data, isError, error } = useReadContracts({
-    contracts: CONTRACTS,
-    query: { refetchInterval: POLL_INTERVAL_MS, retry: 3 },
-  })
-
-  // FINDING 9: fetch history only when latestRoundId changes
-  const fetchHistory = useCallback(
-    async (latestRoundId: bigint): Promise<RoundPoint[]> => {
-      if (!publicClient || latestRoundId === 0n) return []
-      // Extract the aggregator counter from the lower 64 bits.
-      // latestRound() returns phaseId<<64 | counter. History IDs must be
-      // built as phaseId<<64 | n, not as raw integers from latestRoundId-19.
-      const PHASE_MASK  = BigInt('0xFFFFFFFFFFFFFFFF')
-      const phasePrefix = latestRoundId & ~PHASE_MASK          // upper bits (phaseId<<64)
-      const counter     = latestRoundId &  PHASE_MASK          // lower 64 bits
-      const startCount  = counter > 19n ? counter - 19n : 1n
-      const ids: bigint[] = []
-      for (let i = startCount; i <= counter; i++) ids.push(phasePrefix | i)
-
-      const calls = ids.map((id) => ({
-        address: CONTRACT_ADDRESS,
-        abi:     ORACLE_ABI,
-        functionName: 'getRoundData' as const,
-        args:    [id] as const,
-      }))
-
-      try {
-        const results = await publicClient.multicall({ contracts: calls })
-        const points: RoundPoint[] = []
-        results.forEach((r, idx) => {
-          if (r.status === 'success') {
-            const [, answer, , updatedAt] = r.result as [bigint, bigint, bigint, bigint, bigint]
-            // Show aggregator counter (lower 64 bits), not the full encoded id
-            const displayId = Number(ids[idx] & BigInt('0xFFFFFFFFFFFFFFFF'))
-            points.push({
-              roundId:   displayId,
-              price:     Number(answer) / SCALE,
-              updatedAt: Number(updatedAt),
-            })
-          }
-        })
-        return points
-      } catch {
-        return []
-      }
-    },
-    [publicClient]
-  )
-
-  // Process useReadContracts data whenever it changes
-  useEffect(() => {
-    if (!data) return
-
-    const [
-      latestRoundRes,
-      cbTrippedRes,
-      pausedRes,
-      maxStalenessRes,
-      deviationRes,
-      cbBpsRes,
-      reporterRes,
-    ] = data
-
-    const latestRound     = latestRoundRes?.result
-    const cbTripped       = cbTrippedRes?.result
-    const contractPaused  = pausedRes?.result
-    const maxStaleness    = maxStalenessRes?.result
-    const deviationBps    = deviationRes?.result
-    const cbBps           = cbBpsRes?.result
-    const reporterAddr    = reporterRes?.result      as string  | undefined
-
-    const roundIdBig      = latestRound ?? 0n
-    const maxStalenessNum = maxStaleness !== undefined ? Number(maxStaleness) : null
-
-    // Extract aggregator counter from lower 64 bits (phaseId lives in upper bits)
-    const aggregatorCounter = roundIdBig & BigInt('0xFFFFFFFFFFFFFFFF')
-
-    if (isError) {
-      const errMsg = (error as Error | null)?.message ?? 'Contract read failed'
-      setState((prev) => ({ ...prev, loading: false, error: errMsg, hasData: false }))
-      return
-    }
-
-    if (aggregatorCounter === 0n) {
-      // Contract deployed but no rounds written yet
-      setState((prev) => ({
-        ...prev,
-        loading:               false,
-        hasData:               false,
-        circuitBreakerTripped: cbTripped      ?? false,
-        paused:                contractPaused ?? false,
-        maxStaleness:          maxStalenessNum,
-        deviationThresholdBps: deviationBps !== undefined ? Number(deviationBps) : null,
-        circuitBreakerBps:     cbBps        !== undefined ? Number(cbBps)        : null,
-        reporter:              reporterAddr  ?? null,
-      }))
-      return
-    }
-
-    void (async () => {
-      try {
-        // FINDING 10: use getRoundData(id) -- never latestRoundData().
-        // getRoundData does NOT enforce staleness so a stale price still arrives here
-        // and we show the stale badge instead of blanking the dashboard.
-        const [roundResult, historyPoints] = await Promise.all([
-          publicClient?.readContract({
-            address:      CONTRACT_ADDRESS,
-            abi:          ORACLE_ABI,
-            functionName: 'getRoundData',
-            args:         [roundIdBig],
-          }),
-          // FINDING 9: only fetch history when roundId actually changed
-          lastHistoryRound.current !== roundIdBig
-            ? fetchHistory(roundIdBig)
-            : Promise.resolve<RoundPoint[] | null>(null),
-        ])
-
-        if (!roundResult) return
-
-        const [rid, answer, , updatedAt] = roundResult as [bigint, bigint, bigint, bigint, bigint]
-        const updatedAtNum  = Number(updatedAt)
-        const priceNum      = Number(answer) / SCALE
-        const stale         = maxStalenessNum !== null && (Math.floor(Date.now() / 1000) - updatedAtNum) > maxStalenessNum
-        // Display the aggregator counter, not the full phaseId-encoded roundId
-        const displayRoundId = Number(BigInt(rid) & BigInt('0xFFFFFFFFFFFFFFFF'))
-
-        setState((prev) => ({
-          price:                 priceNum,
-          roundId:               displayRoundId,
-          updatedAt:             updatedAtNum,
-          secondsAgo:            Math.floor(Date.now() / 1000) - updatedAtNum,
-          isStale:               stale,
-          circuitBreakerTripped: cbTripped      ?? false,
-          paused:                contractPaused ?? false,
-          maxStaleness:          maxStalenessNum,
-          deviationThresholdBps: deviationBps !== undefined ? Number(deviationBps) : null,
-          circuitBreakerBps:     cbBps        !== undefined ? Number(cbBps)        : null,
-          reporter:              reporterAddr  ?? null,
-          // Only replace history when it was actually fetched this cycle
-          history:               historyPoints !== null ? historyPoints : prev.history,
-          hasData:               true,
-          error:                 null,
-          loading:               false,
-        }))
-
-        if (historyPoints !== null) {
-          lastHistoryRound.current = roundIdBig
-        }
-      } catch (e) {
-        const msg      = (e as Error).message ?? 'Unknown error'
-        setState((prev) => ({ ...prev, loading: false, error: msg }))
-      }
-    })()
-  // Only react to new data from the chain read, not to the "now" clock
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, isError, error])
-
-  // Update secondsAgo and isStale every second from the local clock -- no chain call
   useEffect(() => {
     if (state.updatedAt !== null) {
       setState((prev) => ({
@@ -274,6 +98,136 @@ export function useOracle(): OracleState {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now])
+
+  const fetchHistory = useCallback(
+    async (encodedLatest: bigint): Promise<RoundPoint[]> => {
+      if (!publicClient) return []
+      const phasePrefix = encodedLatest & ~PHASE_MASK
+      const counter     = encodedLatest &  PHASE_MASK
+      const startCount  = counter > 19n ? counter - 19n : 1n
+      const ids: bigint[] = []
+      for (let i = startCount; i <= counter; i++) ids.push(phasePrefix | i)
+
+      const results = await Promise.allSettled(
+        ids.map((id) =>
+          publicClient.readContract({
+            address:      CONTRACT_ADDRESS,
+            abi:          ORACLE_ABI,
+            functionName: 'getRoundData',
+            args:         [id],
+          })
+        )
+      )
+      const points: RoundPoint[] = []
+      results.forEach((r, idx) => {
+        if (r.status === 'fulfilled') {
+          const [, answer, , updatedAt] = r.value as [bigint, bigint, bigint, bigint, bigint]
+          points.push({
+            roundId:   Number(ids[idx] & PHASE_MASK),
+            price:     Number(answer) / SCALE,
+            updatedAt: Number(updatedAt),
+          })
+        }
+      })
+      return points
+    },
+    [publicClient]
+  )
+
+  const poll = useCallback(async () => {
+    if (!publicClient || isFetchingRef.current) return
+    isFetchingRef.current = true
+    try {
+      // Fire all 7 governance reads in parallel -- individual eth_calls, no multicall
+      const [
+        encodedRoundId,
+        cbTripped,
+        isPaused,
+        maxStaleness,
+        deviationBps,
+        cbBps,
+        reporterAddr,
+      ] = await Promise.all([
+        read<bigint>(publicClient, 'latestRound'),
+        read<boolean>(publicClient, 'circuitBreakerTripped'),
+        read<boolean>(publicClient, 'paused'),
+        read<bigint>(publicClient, 'maxStaleness'),
+        read<bigint>(publicClient, 'deviationThresholdBps'),
+        read<bigint>(publicClient, 'circuitBreakerBps'),
+        read<string>(publicClient, 'reporter'),
+      ])
+
+      const maxStalenessNum = Number(maxStaleness)
+      const counter         = encodedRoundId & PHASE_MASK
+
+      if (counter === 0n) {
+        // No rounds written yet -- show governance values but no price
+        setState((prev) => ({
+          ...prev,
+          loading:               false,
+          hasData:               false,
+          circuitBreakerTripped: cbTripped,
+          paused:                isPaused,
+          maxStaleness:          maxStalenessNum,
+          deviationThresholdBps: Number(deviationBps),
+          circuitBreakerBps:     Number(cbBps),
+          reporter:              reporterAddr,
+          error:                 null,
+        }))
+        return
+      }
+
+      // Fetch current round + history in parallel
+      const [roundRaw, historyPoints] = await Promise.all([
+        publicClient.readContract({
+          address:      CONTRACT_ADDRESS,
+          abi:          ORACLE_ABI,
+          functionName: 'getRoundData',
+          args:         [encodedRoundId],
+        }) as Promise<[bigint, bigint, bigint, bigint, bigint]>,
+        lastHistoryRound.current !== encodedRoundId
+          ? fetchHistory(encodedRoundId)
+          : Promise.resolve<RoundPoint[] | null>(null),
+      ])
+
+      const [, answer, , updatedAt] = roundRaw
+      const updatedAtNum = Number(updatedAt)
+      const priceNum     = Number(answer) / SCALE
+      const stale        = (Math.floor(Date.now() / 1000) - updatedAtNum) > maxStalenessNum
+
+      if (historyPoints !== null) lastHistoryRound.current = encodedRoundId
+
+      setState((prev) => ({
+        price:                 priceNum,
+        roundId:               Number(counter),
+        updatedAt:             updatedAtNum,
+        secondsAgo:            Math.floor(Date.now() / 1000) - updatedAtNum,
+        isStale:               stale,
+        circuitBreakerTripped: cbTripped,
+        paused:                isPaused,
+        maxStaleness:          maxStalenessNum,
+        deviationThresholdBps: Number(deviationBps),
+        circuitBreakerBps:     Number(cbBps),
+        reporter:              reporterAddr,
+        history:               historyPoints !== null ? historyPoints : prev.history,
+        hasData:               true,
+        error:                 null,
+        loading:               false,
+      }))
+    } catch (e) {
+      const msg = (e as Error).message ?? 'Contract read failed'
+      setState((prev) => ({ ...prev, loading: false, error: msg }))
+    } finally {
+      isFetchingRef.current = false
+    }
+  }, [publicClient, fetchHistory])
+
+  // Initial fetch + polling interval
+  useEffect(() => {
+    void poll()
+    const id = setInterval(() => void poll(), POLL_INTERVAL_MS)
+    return () => clearInterval(id)
+  }, [poll])
 
   return state
 }

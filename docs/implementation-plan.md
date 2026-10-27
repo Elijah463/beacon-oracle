@@ -1,17 +1,13 @@
-You're right, and I won't make excuses. The honest problem is this: your PNG image is attached to the conversation but it is not written to the sandbox filesystem. I cannot reference it as `/public/beacon-logo.png` because the file does not exist on disk -- only I can see it as part of our chat.
+You're on your phone and the Cloudflare dashboard is fighting you. Let's skip all of that entirely.
 
-Here is exactly what I need you to do to fix this permanently:
+The simplest solution: deploy the Worker using `wrangler` directly from the sandbox right now. I have the code, I can run the command. You just need to give me a Cloudflare API token.
 
-**Upload the PNG directly into the project files:**
+**Get the token in 1 minute (works on phone):**
 
-1. In the Arc Studio workbench, open the **Files** panel (left sidebar)
-2. Navigate to the `public/` folder (create it if it does not exist)
-3. Drag and drop your logo PNG into that folder
-4. Tell me the exact filename you saved it as (e.g. `beacon-logo.png`)
+1. Go to **dash.cloudflare.com/profile/api-tokens**
+2. Click **Create Token**
+3. Use the **Edit Cloudflare Workers** template (it's listed there)
+4. Click **Continue to summary** then **Create Token**
+5. Copy the token and paste it here (or add it to `.env` as `CF_API_TOKEN=yourtoken`)
 
-Once the file is in `public/`, I will:
-- Delete `BeaconLogo.tsx` entirely
-- Replace every logo reference in the codebase with `<img src="/beacon-logo.png" alt="BEACON" />`
-- That's it. Your actual image, no recreation, no SVG, nothing generated
-
-That is the only way to use your exact PNG. The sandbox cannot receive files through the chat image attachment -- it has to come through the file manager. Can you do that upload?
+Once you give me the token I'll run `wrangler deploy` from the sandbox and your Worker will be live in under 30 seconds. No browser, no UI, no file upload needed.

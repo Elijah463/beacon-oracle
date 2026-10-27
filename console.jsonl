@@ -180,3 +180,146 @@
 {"level":"debug","message":"[vite] invalidate /src/main.tsx: Could not Fast Refresh (\"true\" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports","timestamp":1792564026031}
 {"level":"debug","message":"[vite] hot updated: /src/main.tsx","timestamp":1792564026031}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792564026031}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792580117047}
+{"level":"debug","message":"[vite] connected.","timestamp":1792619563664}
+{"level":"debug","message":"[vite] connected.","timestamp":1792619900871}
+{"level":"debug","message":"[vite] connected.","timestamp":1792620034730}
+{"level":"debug","message":"[vite] connected.","timestamp":1792708401861}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792709084161}
+{"level":"debug","message":"[vite] connected.","timestamp":1792965995106}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792966242337}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792966242621}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792966242622}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792967166321}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792967166688}
+{"level":"debug","message":"[vite] connected.","timestamp":1792967206155}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792972636459}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792972851561}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792972851564}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792973235203}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792973235206}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792973508356}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792973508360}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792973694817}
+{"level":"debug","message":"[vite] connected.","timestamp":1792973813718}
+{"level":"debug","message":"[vite] connected.","timestamp":1792973814621}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792974080118}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792974080266}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792974277996}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792974278404}
+{"level":"debug","message":"[vite] connected.","timestamp":1792974284832}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792974588350}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792974588537}
+{"level":"debug","message":"[vite] connected.","timestamp":1792974595036}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792974877645}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792975323708}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792975323711}
+{"level":"debug","message":"[vite] connected.","timestamp":1792975331168}
+{"level":"debug","message":"[vite] connected.","timestamp":1792991574977}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792992465150}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792992465818}
+{"level":"debug","message":"[vite] connected.","timestamp":1792992474232}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792992638867}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792992639007}
+{"level":"debug","message":"[vite] connected.","timestamp":1792992776143}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792994408937}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792994408956}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792994476040}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792994476050}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792995013818}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792995013821}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792995384587}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792995384590}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792995384591}
+{"level":"debug","message":"[vite] connected.","timestamp":1793000633299}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793000846907}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793000846922}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793104489410}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793104489411}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793104490289}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793104490289}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793104492021}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793104492021}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793104499806}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793104499807}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793104499808}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793104499808}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793104502633}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793104502633}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793104502635}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793104502635}
+{"level":"debug","message":"[vite] connected.","timestamp":1793104650685}
+{"level":"debug","message":"[vite] connected.","timestamp":1793104970471}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793105250973}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793105251161}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793114217987}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793130085178}
+{"level":"debug","message":"[vite] connected.","timestamp":1793130574219}
+{"level":"debug","message":"[vite] connected.","timestamp":1793130636452}
+{"level":"debug","message":"[vite] connected.","timestamp":1793130640352}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793130895261}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793130895263}
+{"level":"debug","message":"[vite] connected.","timestamp":1793130932809}
+{"level":"debug","message":"[vite] connected.","timestamp":1793130937786}
+{"level":"debug","message":"[vite] connected.","timestamp":1793130939696}
+{"level":"debug","message":"[vite] connected.","timestamp":1793130945497}
+{"level":"debug","message":"[vite] connected.","timestamp":1793131116294}
+{"level":"error","message":"Warning: You are calling ReactDOMClient.createRoot() on a container that has already been passed to createRoot() before. Instead, call root.render() on the existing root instead if you want to update it.","timestamp":1793131230057}
+{"level":"debug","message":"[vite] invalidate /src/main.tsx: Could not Fast Refresh (\"true\" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports","timestamp":1793131230063}
+{"level":"debug","message":"[vite] hot updated: /src/main.tsx","timestamp":1793131230063}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793131230064}
+{"level":"debug","message":"(previous line repeated 1× more)","timestamp":1793131237701}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793131237701}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793131237709}
+{"level":"debug","message":"(previous line repeated 1× more)","timestamp":1793131261827}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793131261827}
+{"level":"debug","message":"[vite] connected.","timestamp":1793131453953}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793131485357}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793131485359}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793131485985}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793131485987}
+{"level":"error","message":"Warning: React has detected a change in the order of Hooks called by %s. This will lead to bugs and errors if not fixed. For more information, read the Rules of Hooks: https://reactjs.org/link/rules-of-hooks\n\n   Previous render            Next render\n   ------------------------------------------------------\n%s   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n%s OracleDashboard 1. useState                   useState\n2. useState                   useState\n3. useContext                 useContext\n4. useRef                     useRef\n5. useMemo                    useMemo\n6. useSyncExternalStore       useSyncExternalStore\n7. useEffect                  useEffect\n8. useDebugValue              useDebugValue\n9. useRef                     useRef\n10. useEffect                 useRef\n \n    at OracleDashboard (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/src/components/OracleDashboard.tsx?t=1793131478047:38:35)\n    at App (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/src/App.tsx:30:27)\n    at Le (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/connectkit.js?v=d5d52c15:18514:42)\n    at Web3ContextProvider (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/connectkit.js?v=d5d52c15:34141:30)\n    at ConnectKitProvider (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/connectkit.js?v=d5d52c15:37631:29)\n    at QueryClientProvider (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-WZEH4STI.js?v=a461e794:39:30)\n    at Hydrate (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-LSHTF7A6.js?v=a461e794:118:11)\n    at WagmiProvider (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-LSHTF7A6.js?v=a461e794:142:11)","timestamp":1793131486051}
+{"level":"error","message":"Uncaught Error: Rendered fewer hooks than expected. This may be caused by an accidental early return statement.","timestamp":1793131486056,"source":"https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:18521:13","stack":"Error: Rendered fewer hooks than expected. This may be caused by an accidental early return statement.\n    at renderWithHooks (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:18521:19)\n    at updateFunctionComponent (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:21508:28)\n    at beginWork (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:22850:22)\n    at HTMLUnknownElement.callCallback2 (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:10558:22)\n    at Object.invokeGuardedCallbackDev (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:10583:24)\n    at invokeGuardedCallback (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:10617:39)\n    at beginWork$1 (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26696:15)\n    at performUnitOfWork (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26129:20)\n    at workLoopSync (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26068:13)\n    at renderRootSync (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26047:15)"}
+{"level":"error","message":"Uncaught Error: Rendered fewer hooks than expected. This may be caused by an accidental early return statement.","timestamp":1793131486063,"source":"https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:18521:13","stack":"Error: Rendered fewer hooks than expected. This may be caused by an accidental early return statement.\n    at renderWithHooks (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:18521:19)\n    at updateFunctionComponent (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:21508:28)\n    at beginWork (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:22850:22)\n    at HTMLUnknownElement.callCallback2 (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:10558:22)\n    at Object.invokeGuardedCallbackDev (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:10583:24)\n    at invokeGuardedCallback (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:10617:39)\n    at beginWork$1 (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26696:15)\n    at performUnitOfWork (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26129:20)\n    at workLoopSync (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26068:13)\n    at renderRootSync (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26047:15)"}
+{"level":"error","message":"The above error occurred in the <OracleDashboard> component:\n\n    at OracleDashboard (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/src/components/OracleDashboard.tsx?t=1793131478047:38:35)\n    at App (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/src/App.tsx:30:27)\n    at Le (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/connectkit.js?v=d5d52c15:18514:42)\n    at Web3ContextProvider (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/connectkit.js?v=d5d52c15:34141:30)\n    at ConnectKitProvider (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/connectkit.js?v=d5d52c15:37631:29)\n    at QueryClientProvider (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-WZEH4STI.js?v=a461e794:39:30)\n    at Hydrate (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-LSHTF7A6.js?v=a461e794:118:11)\n    at WagmiProvider (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-LSHTF7A6.js?v=a461e794:142:11)\n\nConsider adding an error boundary to your tree to customize error handling behavior.\nVisit https://reactjs.org/link/error-boundaries to learn more about error boundaries.","timestamp":1793131486067}
+{"level":"error","message":"Unhandled promise rejection: Error: Rendered fewer hooks than expected. This may be caused by an accidental early return statement.\n    at renderWithHooks (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:18521:19)\n    at updateFunctionComponent (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:21508:28)\n    at beginWork (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:22850:22)\n    at beginWork$1 (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26684:22)\n    at performUnitOfWork (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26129:20)\n    at workLoopSync (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26068:13)\n    at renderRootSync (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26047:15)\n    at recoverFromConcurrentError (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:25664:28)\n    at performSyncWorkOnRoot (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:25810:28)\n    at flushSyncCallbacks (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:16044:30)","timestamp":1793131486084,"stack":"Error: Rendered fewer hooks than expected. This may be caused by an accidental early return statement.\n    at renderWithHooks (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:18521:19)\n    at updateFunctionComponent (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:21508:28)\n    at beginWork (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:22850:22)\n    at beginWork$1 (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26684:22)\n    at performUnitOfWork (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26129:20)\n    at workLoopSync (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26068:13)\n    at renderRootSync (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:26047:15)\n    at recoverFromConcurrentError (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:25664:28)\n    at performSyncWorkOnRoot (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:25810:28)\n    at flushSyncCallbacks (https://iipdrnhe1s3w9z9crlyii.preview.studio.arc.io/node_modules/.vite/deps/chunk-YI6NTZAD.js?v=a461e794:16044:30)"}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793131494484}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793131494485}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793131504589}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793131504589}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793131504796}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793131504796}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793131512470}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793131512471}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793131513771}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793131513772}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793131513926}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793131513927}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793131518976}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793131518976}
+{"level":"debug","message":"[vite] connected.","timestamp":1793131566487}
+{"level":"debug","message":"[vite] connected.","timestamp":1793132750688}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793132956816}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793132956817}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793132957014}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793132957015}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793132963587}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793132963587}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793132963840}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793132963841}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleStats.tsx","timestamp":1793132987459}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793132987459}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleStats.tsx","timestamp":1793132987465}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793132987465}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793132990860}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793132990861}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793132990876}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793132990876}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793132993222}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793132993222}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793132993299}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793132993299}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793133006531}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793133006531}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793133006533}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793133006533}
