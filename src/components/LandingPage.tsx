@@ -85,13 +85,14 @@ function OrderbookCanvas() {
       buildRows(pair)
     }
 
+    // Label: top-left, well away from the number columns
     const drawLabel = () => {
       ctx.save()
-      ctx.globalAlpha = 0.65
+      ctx.globalAlpha = 0.60
       ctx.font = 'bold 11px "JetBrains Mono", monospace'
-      ctx.textAlign = 'right'
+      ctx.textAlign = 'left'
       ctx.fillStyle = '#00D66F'
-      ctx.fillText(pair, canvas.width - 14, 20)
+      ctx.fillText(pair, 14, 20)
       ctx.restore()
     }
 
@@ -110,18 +111,21 @@ function OrderbookCanvas() {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.font = '11px "JetBrains Mono", monospace'
 
-      const midX = canvas.width / 2
-      const priceX = midX - 12
-      const sizeX  = midX + 88
+      // Two columns centred as a block:
+      // |<-- priceW -->|<-- gutter -->|<-- sizeW -->|
+      // Price column is right-aligned, size column is left-aligned.
+      // Total block width = priceW + gutter + sizeW, centred on midX.
+      const midX    = canvas.width / 2
+      const gutter  = 20
+      const priceX  = midX - gutter / 2               // right edge of price col
+      const sizeX   = midX + gutter / 2               // left edge of size col
 
       for (const row of rows) {
         // Slow sinusoidal alpha pulse
         const pulse = Math.sin(t * row.speed * 60 + row.y) * 0.5 + 0.5
         ctx.globalAlpha = row.alpha * (0.45 + pulse * 0.55)
 
-        const buyColor  = '#22c55e'   // plain green for buy
-        const sellColor = '#ef4444'   // red for sell
-        ctx.fillStyle = row.isBuy ? buyColor : sellColor
+        ctx.fillStyle = row.isBuy ? '#22c55e' : '#ef4444'
 
         ctx.textAlign = 'right'
         ctx.fillText(row.price, priceX, row.y)
