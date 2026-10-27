@@ -9,14 +9,17 @@ It derives the real-time value of 1 USDC in Nigerian Naira by independently aggr
 ## Architecture
 
 ```
-Off-chain Reporter (Node/Bun)
+Off-chain Reporter (Bun on Fly.io)
       |
-      |-- Fetches USDC/USD from 3 independent spot price sources
-      |-- Fetches USD/NGN from 2 independent FX sources (1-hour cache)
+      |-- Leg A: USDC/USD from 5 CEX spot sources (Coinbase, Binance, OKX, Bitget, Bybit)
+      |-- Leg B: NGN/USD from 3 server-friendly sources (quorum 2):
+      |     CoinGecko USDT/NGN  -- real-time, called every 30s cycle
+      |     ExchangeRate-API    -- USD/NGN mid-market, cached 24h
+      |     CurrencyAPI         -- USD/NGN aggregated, cached 1h
       |-- Computes median of each leg independently
-      |-- Applies outlier rejection (median-distance filter)
-      |-- Checks deviation vs last on-chain price (50 bps threshold)
-      |-- Clamps timestamp to latest on-chain block
+      |-- Applies outlier rejection (10% median-distance filter)
+      |-- Checks deviation vs last on-chain price (0.2% / 20 bps threshold)
+      |-- Heartbeat: force-publish every 1h even if no deviation
       |
       v
 USDCNGNOracle.sol (Arc Testnet)
@@ -55,8 +58,8 @@ Example: 1 USDC = 1,620.50 NGN stored as `162050000000`.
 ## Smart Contract
 
 **Network:** Arc Testnet
-**Address:** `0x5147ebbc5d7124a27325a0ea04f6b552410ec90d`
-**Explorer:** https://explorer.testnet.arc.io/address/0x5147ebbc5d7124a27325a0ea04f6b552410ec90d
+**Address:** `0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797` (ERC1967 proxy)
+**Explorer:** https://explorer.testnet.arc.io/address/0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797
 
 ### Key functions
 
@@ -68,7 +71,7 @@ Example: 1 USDC = 1,620.50 NGN stored as `162050000000`.
 | `quoteUSDCToNGN(usdcAmount)` | Convert USDC atomic units to NGN atomic units. |
 | `quoteNGNToUSDC(ngnAmount)` | Convert NGN atomic units to USDC atomic units. |
 | `latestQuoteMetadata()` | Round ID, price, timestamp, age for the current quote. |
-| `transmit(answer, timestamp)` | Reporter-only: submit a new price round. |
+| `transmit(answer, timestamp, signature)` | Reporter-only: submit a signed price round. |
 | `resetCircuitBreakerAndPublish(answer, timestamp)` | Owner: accept a verified large move. |
 | `decimals()` | Returns 8. |
 | `description()` | Returns "USDC / NGN". |

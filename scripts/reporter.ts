@@ -30,11 +30,12 @@
  *
  * USES Circle developer-controlled wallet -- no raw private key in this process.
  *
- * Prerequisites (set in .env):
+ * Prerequisites (set as Fly.io secrets):
  *   CIRCLE_API_KEY                -- Circle Standard Developer API key
  *   CIRCLE_ENTITY_SECRET          -- Registered 32-byte entity secret
  *   REPORTER_WALLET_ID            -- Wallet ID from scripts/setup-reporter-wallet.ts
  *   VITE_ORACLE_CONTRACT_ADDRESS  -- Deployed BEACON proxy address on Arc Testnet
+ *   REPORTER_SIGNING_KEY          -- Hex private key for ECDSA payload signing
  */
 
 import { initiateDeveloperControlledWalletsClient } from '@circle-fin/developer-controlled-wallets'
@@ -48,10 +49,9 @@ import {
   fetchUsdcUsdOKX,
   fetchUsdcUsdBitget,
   fetchUsdcUsdBybit,
-  fetchNgnUsdtBinanceP2P,
-  fetchNgnUsdtQuidax,
-  fetchNgnUsdtBybitP2P,
-  fetchNgnUsdtBitgetP2P,
+  fetchNgnUsdtCoinGecko,
+  fetchNgnUsdtExchangeRateApi,
+  fetchNgnUsdtCurrencyApi,
   fetchAll,
   median,
   rejectOutliers,
@@ -61,7 +61,6 @@ import {
 // Config
 // ---------------------------------------------------------------------------
 
-const BITGET_API_KEY       = process.env.BITGET_API_KEY ?? ''
 const CIRCLE_API_KEY       = process.env.CIRCLE_API_KEY ?? ''
 const CIRCLE_ENTITY_SECRET = process.env.CIRCLE_ENTITY_SECRET
   ?? process.env.ENTITY_SECRET
@@ -70,10 +69,8 @@ const CIRCLE_ENTITY_SECRET = process.env.CIRCLE_ENTITY_SECRET
 const REPORTER_WALLET_ID   = process.env.REPORTER_WALLET_ID ?? ''
 const CONTRACT_ADDRESS     = (process.env.VITE_ORACLE_CONTRACT_ADDRESS ?? '') as `0x${string}`
 
-// CF_WORKER_URL: your Cloudflare Worker relay URL for Nigerian P2P geo-bypass.
-// Format: https://beacon-ngn-relay.yourname.workers.dev
-// Deploy cloudflare-worker/index.js to Cloudflare, set this to its URL.
-// If not set, P2P sources are fetched directly (works from Nigerian IPs only).
+// CF_WORKER_URL: retained in config for future use but no longer used by the
+// reporter. NGN sources now call server-friendly APIs that work from any IP.
 const CF_WORKER_URL = process.env.CF_WORKER_URL ?? ''
 
 // REPORTER_SIGNING_KEY: a plain hex private key used ONLY for signing the
@@ -159,9 +156,7 @@ if (signingAccount) {
 }
 
 if (CF_WORKER_URL) {
-  console.log('[BEACON] CF Worker relay: configured -- P2P sources routed via Cloudflare Lagos edge')
-} else {
-  console.log('[BEACON] CF Worker relay: not set -- P2P sources attempted directly (needs Nigerian IP)')
+  console.log('[BEACON] CF Worker relay: configured (unused -- NGN sources are server-friendly)')
 }
 
 // ---------------------------------------------------------------------------
@@ -198,8 +193,8 @@ const DEVIATION_GATE_BPS = 20n
 // Heartbeat: force publish if no update for 1 hour regardless of deviation
 const HEARTBEAT_SECS     = 3600
 // Quorum: minimum live sources required per leg before aggregation
-const USDC_USD_QUORUM    = 2   // out of 5 sources
-const NGN_USDT_QUORUM    = 2   // out of 4 sources
+const USDC_USD_QUORUM    = 2   // out of 5 sources (Coinbase, Binance, OKX, Bitget, Bybit)
+const NGN_USDT_QUORUM    = 2   // out of 3 sources (CoinGecko, ExchangeRateApi, CurrencyApi)
 
 // Circle transaction polling
 const POLL_INTERVAL_MS   = 2_000
@@ -303,17 +298,16 @@ async function derivePrice(): Promise<bigint> {
       () => fetchUsdcUsdBybit(),
     ]),
     fetchAll([
-      () => fetchNgnUsdtBinanceP2P(CF_WORKER_URL),
-      () => fetchNgnUsdtQuidax(CF_WORKER_URL),
-      () => fetchNgnUsdtBybitP2P(CF_WORKER_URL),
-      () => fetchNgnUsdtBitgetP2P(BITGET_API_KEY, CF_WORKER_URL),
+      () => fetchNgnUsdtCoinGecko(),
+      () => fetchNgnUsdtExchangeRateApi(),
+      () => fetchNgnUsdtCurrencyApi(),
     ]),
   ])
 
   // Log source results
   for (const f of usdcResult.failures) console.warn(`[usdc/usd] failed: ${f.error}`)
-  for (const f of ngnResult.failures)  console.warn(`[ngn/usdt] failed: ${f.error}`)
-  console.log(`[sources] USDC/USD: ${usdcResult.successes.length}/5 ok | NGN/USDT: ${ngnResult.successes.length}/4 ok`)
+  for (const f of ngnResult.failures)  console.warn(`[ngn/usd] failed: ${f.error}`)
+  console.log(`[sources] USDC/USD: ${usdcResult.successes.length}/5 ok | NGN/USD: ${ngnResult.successes.length}/3 ok`)
 
   // Enforce quorum before outlier rejection
   if (usdcResult.successes.length < USDC_USD_QUORUM) {
@@ -323,39 +317,38 @@ async function derivePrice(): Promise<bigint> {
   }
   if (ngnResult.successes.length < NGN_USDT_QUORUM) {
     throw new Error(
-      `NGN/USDT quorum not met: ${ngnResult.successes.length} sources (need ${NGN_USDT_QUORUM})`
+      `NGN/USD quorum not met: ${ngnResult.successes.length} sources (need ${NGN_USDT_QUORUM})`
     )
   }
 
-  // Reject outliers (10% deviation threshold, per spec)
+  // Reject outliers (10% deviation threshold)
   const cleanUsdc = rejectOutliers(usdcResult.successes, 0.10)
   const cleanNgn  = rejectOutliers(ngnResult.successes,  0.10)
 
   if (cleanUsdc.length === 0) throw new Error('All USDC/USD values rejected as outliers')
-  if (cleanNgn.length === 0)  throw new Error('All NGN/USDT values rejected as outliers')
+  if (cleanNgn.length === 0)  throw new Error('All NGN/USD values rejected as outliers')
   if (cleanUsdc.length < USDC_USD_QUORUM) {
     throw new Error(`Post-outlier USDC/USD quorum not met: ${cleanUsdc.length} sources`)
   }
   if (cleanNgn.length < NGN_USDT_QUORUM) {
-    throw new Error(`Post-outlier NGN/USDT quorum not met: ${cleanNgn.length} sources`)
+    throw new Error(`Post-outlier NGN/USD quorum not met: ${cleanNgn.length} sources`)
   }
 
   // Take the median of each leg
   const usdcUsd = median(cleanUsdc.map((r) => r.value))  // e.g. 0.9997
-  const ngnUsdt = median(cleanNgn.map((r) => r.value))   // e.g. 1625.00
+  const ngnUsd  = median(cleanNgn.map((r) => r.value))   // e.g. 1625.00
 
-  // USDC/NGN = USDC/USD * NGN/USDT
-  // (NGN/USDT is treated as NGN/USD since USDT ~= USD in P2P markets)
+  // USDC/NGN = USDC/USD * NGN/USD
   // Use BigInt arithmetic -- no floating-point multiplication
   const usdcUsdBig = floatToBigInt(usdcUsd, 12)  // 12 decimal precision
-  const ngnUsdtBig = floatToBigInt(ngnUsdt, 12)
-  // price (8 dec) = (usdcUsd * ngnUsdt * 1e8) / (1e12 * 1e12) * 1e12
-  //              = (usdcUsdBig * ngnUsdtBig) / 1e(12+12-8) = / 1e16
-  const priceBig = (usdcUsdBig * ngnUsdtBig) / (10n ** 16n)
+  const ngnUsdBig = floatToBigInt(ngnUsd, 12)
+  // price (8 dec) = (usdcUsd * ngnUsd * 1e8) / (1e12 * 1e12) * 1e12
+  //              = (usdcUsdBig * ngnUsdBig) / 1e(12+12-8) = / 1e16
+  const priceBig = (usdcUsdBig * ngnUsdBig) / (10n ** 16n)
 
   const elapsed = ((Date.now() - now) / 1000).toFixed(1)
   console.log(
-    `[price] USDC/USD=${usdcUsd.toFixed(6)} | NGN/USDT=${ngnUsdt.toFixed(2)} | ` +
+    `[price] USDC/USD=${usdcUsd.toFixed(6)} | NGN/USD=${ngnUsd.toFixed(2)} | ` +
     `USDC/NGN=${formatPrice(priceBig)} | sources(${cleanUsdc.length}+${cleanNgn.length}) | ${elapsed}s`
   )
 
@@ -640,7 +633,7 @@ console.log(`[BEACON] Reporter wallet:  ${REPORTER_WALLET_ID}`)
 console.log(`[BEACON] Cycle:            every ${CYCLE_INTERVAL_MS / 1000}s`)
 console.log(`[BEACON] Deviation gate:   ${DEVIATION_GATE_BPS}bps (${Number(DEVIATION_GATE_BPS) / 100}%)`)
 console.log(`[BEACON] Heartbeat:        ${HEARTBEAT_SECS}s (${HEARTBEAT_SECS / 3600}h)`)
-console.log(`[BEACON] Quorum:           USDC/USD ${USDC_USD_QUORUM}/5 | NGN/USDT ${NGN_USDT_QUORUM}/4`)
+console.log(`[BEACON] Quorum:           USDC/USD ${USDC_USD_QUORUM}/5 | NGN/USD ${NGN_USDT_QUORUM}/3`)
 console.log(`[BEACON] Outlier filter:   10% max deviation from group median`)
 console.log('')
 

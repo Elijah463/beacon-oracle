@@ -11,7 +11,7 @@ interface LandingPageProps {
   onEnterDashboard: () => void
 }
 
-const CONTRACT = '0x5147ebbc5d7124a27325a0ea04f6b552410ec90d'
+const CONTRACT = '0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797'
 const EXPLORER = `https://explorer.testnet.arc.io/address/${CONTRACT}`
 const SHORT_CONTRACT = `${CONTRACT.slice(0, 8)}...${CONTRACT.slice(-6)}`
 
@@ -75,7 +75,7 @@ export function LandingPage({ onEnterDashboard }: LandingPageProps) {
           {[
             { value: '8', label: 'Decimal precision' },
             { value: '100', label: 'Rounds in history' },
-            { value: '0.5%', label: 'Deviation threshold' },
+            { value: '0.2%', label: 'Deviation threshold' },
             { value: 'UUPS', label: 'Upgradeable proxy' },
           ].map(({ value, label }) => (
             <div key={label} style={{ textAlign: 'center' }}>
@@ -104,18 +104,17 @@ export function LandingPage({ onEnterDashboard }: LandingPageProps) {
               </div>
               <h3 style={cardTitleStyle}>Off-chain aggregation</h3>
               <p style={cardBodyStyle}>
-                A reporter service fetches USDC/USD quotes from multiple independent
-                spot markets and USD/NGN rates from separate FX data sources.
-                Each leg is processed independently: outliers are removed using
-                median-distance filtering, a quorum of at least two sources is
-                required per leg, and the final price is computed as
-                median(USDC/USD) multiplied by median(USD/NGN).
+                A reporter service fetches USDC/USD quotes from five independent
+                CEX spot markets and USD/NGN rates from three independent sources:
+                CoinGecko (real-time USDT/NGN crypto market rate), ExchangeRate-API,
+                and CurrencyAPI. Each leg is aggregated independently and the final
+                USDC/NGN price is median(USDC/USD) multiplied by median(NGN/USD).
               </p>
               <ul style={listStyle}>
-                <li>Quorum-enforced per leg (min 2 sources)</li>
-                <li>Outlier rejection via median-distance filter</li>
-                <li>FX data cached to stay within API limits</li>
-                <li>Heartbeat capped below the staleness window</li>
+                <li>5 USDC/USD sources (Coinbase, Binance, OKX, Bitget, Bybit)</li>
+                <li>3 NGN/USD sources, quorum 2, outlier-filtered</li>
+                <li>FX sources cached (24h / 1h) to stay within free tier limits</li>
+                <li>0.2% deviation gate + 1h heartbeat publish rules</li>
               </ul>
             </div>
 
@@ -135,7 +134,7 @@ export function LandingPage({ onEnterDashboard }: LandingPageProps) {
               </p>
               <ul style={listStyle}>
                 <li>Staleness guard reverts reads older than 1 hour</li>
-                <li>Circuit breaker freezes updates above 10% single-move</li>
+                <li>On-chain circuit breaker freezes updates on large single moves</li>
                 <li>Strict timestamp ordering per round</li>
                 <li>UUPS proxy -- logic upgradeable without address change</li>
               </ul>

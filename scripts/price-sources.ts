@@ -5,27 +5,25 @@
  *
  * TWO INDEPENDENT LEGS:
  *   Leg A -- USDC/USD  : Coinbase, Binance, OKX, Bitget, Bybit (5 sources, quorum 3)
- *   Leg B -- NGN/USDT  : Binance P2P, Quidax, Bybit P2P, Bitget P2P (4 sources, quorum 2)
- *                        (NGN/USDT is used as the NGN/USD proxy -- this is the realistic
- *                         price Nigerians pay for a dollar, sourced from active P2P markets)
+ *   Leg B -- NGN/USD   : CoinGecko (USDT/NGN), ExchangeRate-API (USD/NGN),
+ *                        CurrencyAPI (USD/NGN) -- 3 sources, quorum 2.
+ *                        All three work from any server IP -- no geo-restrictions,
+ *                        no API keys required.
+ *
+ * CACHING STRATEGY (Leg B):
+ *   CoinGecko   -- called every cycle (real-time USDT/NGN crypto market rate)
+ *   ExchangeRateApi -- cached 24h (data only updates once per day; aggressive
+ *                      polling risks rate-limit bans)
+ *   CurrencyApi     -- cached 1h  (jsDelivr CDN, no rate limits, daily update)
  *
  * RULES PER PROVIDER:
  *   - Separate token-bucket rate limiter per provider (configurable RPS)
  *   - 429 response: respect Retry-After header; fall back to exponential backoff
  *   - Never retry in a tight loop -- all retries use await before the next attempt
- *   - Successful responses are cached; stale detection via response timestamp fields
  *   - Configurable per-request timeout (default 8s)
  *   - Outlier rejection: any source deviating >10% from the group median is invalidated
  *   - Sanity bounds: values outside hard limits are rejected before entering aggregation
  *   - Error messages never include URLs (no API key leakage in logs)
- *
- * CLOUDFLARE WORKER RELAY (NGN/USDT P2P sources only):
- *   P2P endpoints geo-restrict requests from non-Nigerian IPs. The reporter
- *   routes P2P fetches through a Cloudflare Worker deployed at CF_WORKER_URL.
- *   Cloudflare's Lagos edge node makes the request appear to originate from Nigeria.
- *   The USDC/USD sources (Leg A) always fetch directly -- they work from any IP.
- *   If CF_WORKER_URL is not set, P2P sources are attempted directly (works from
- *   Nigerian IPs or when testing locally).
  */
 
 // ---------------------------------------------------------------------------
@@ -99,98 +97,21 @@ export class RateLimiter {
 }
 
 // Per-provider rate limiters (conservative -- stay well within free tiers)
+// Leg A (USDC/USD): CEX spot APIs, generous limits
+// Leg B (NGN/USD):  CoinGecko free ~30 req/min; FX sources cached so rarely called
 export const limiters: Record<string, RateLimiter> = {
-  'Coinbase':       new RateLimiter(3, 0.5),
-  'BinanceCEX':     new RateLimiter(3, 0.5),
-  'OKX':            new RateLimiter(3, 0.5),
-  'BitgetCEX':      new RateLimiter(2, 0.33),
-  'BybitCEX':       new RateLimiter(2, 0.33),
-  'BinanceP2P':     new RateLimiter(2, 0.2),
-  'Quidax':         new RateLimiter(3, 0.5),
-  'BybitP2P':       new RateLimiter(2, 0.2),
-  'BitgetP2P':      new RateLimiter(2, 0.2),
+  'Coinbase':         new RateLimiter(3, 0.5),
+  'BinanceCEX':       new RateLimiter(3, 0.5),
+  'OKX':              new RateLimiter(3, 0.5),
+  'BitgetCEX':        new RateLimiter(2, 0.33),
+  'BybitCEX':         new RateLimiter(2, 0.33),
+  'CoinGecko':        new RateLimiter(2, 0.25),   // ~30 req/min free; 1 per 4s is safe
+  'ExchangeRateApi':  new RateLimiter(1, 0.001),  // 24h cache -- limiter is a backstop only
+  'CurrencyApi':      new RateLimiter(2, 0.5),    // CDN, no rate limits; limiter is courtesy
 }
 
 // ---------------------------------------------------------------------------
-// Cloudflare Worker relay helper
-// ---------------------------------------------------------------------------
-
-/**
- * Routes a request through the Cloudflare Worker relay when cfWorkerUrl is set.
- * The Worker forwards the request from Cloudflare's Lagos edge node, making it
- * appear to originate from Nigeria to geo-restricted P2P endpoints.
- *
- * If cfWorkerUrl is empty, falls back to a direct fetch (works from Nigerian IPs).
- */
-async function cfFetch(
-  cfWorkerUrl: string,
-  targetUrl: string,
-  sourceName: string,
-  opts: {
-    method?: string
-    body?: unknown
-    headers?: Record<string, string>
-    timeoutMs?: number
-  } = {}
-): Promise<unknown> {
-  const { method = 'GET', body, headers = {}, timeoutMs = 12_000 } = opts
-
-  // Direct fetch when no Worker URL is configured
-  if (!cfWorkerUrl) {
-    return fetchJson(targetUrl, sourceName, {
-      method,
-      body: body ? JSON.stringify(body) : undefined,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-        ...headers,
-      },
-      timeoutMs,
-    })
-  }
-
-  // Route through Cloudflare Worker relay
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs)
-
-  try {
-    const res = await fetch(cfWorkerUrl, {
-      method: 'POST',
-      signal: ctrl.signal,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url: targetUrl,
-        method,
-        body,
-        headers,
-      }),
-    })
-    clearTimeout(timer)
-
-    if (res.status === 429) {
-      const retryAfter = res.headers.get('Retry-After')
-      const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 5_000
-      console.warn(`[${sourceName}] CF Worker 429. Waiting ${waitMs}ms.`)
-      await sleep(waitMs)
-      throw new Error(`${sourceName}: rate limited by CF Worker relay`)
-    }
-
-    if (!res.ok) {
-      throw new Error(`${sourceName}: CF Worker returned HTTP ${res.status}`)
-    }
-
-    return await res.json()
-  } catch (err: unknown) {
-    clearTimeout(timer)
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error(`${sourceName}: CF Worker relay timed out after ${timeoutMs}ms`)
-    }
-    throw err
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Fetch helper (direct -- used for Leg A USDC/USD sources)
+// Fetch helper
 // ---------------------------------------------------------------------------
 
 interface FetchOptions {
@@ -201,11 +122,11 @@ interface FetchOptions {
   body?: string
 }
 
-async function fetchJson(
+async function fetchJson<T = unknown>(
   url: string,
   sourceName: string,
   opts: FetchOptions = {}
-): Promise<unknown> {
+): Promise<T> {
   const { timeoutMs = 8_000, maxRetries = 2, headers = {}, method = 'GET', body } = opts
 
   let attempt = 0
@@ -237,7 +158,7 @@ async function fetchJson(
       }
 
       if (!res.ok) throw new Error(`${sourceName} HTTP ${res.status}`)
-      return await res.json()
+      return await res.json() as T
 
     } catch (err: unknown) {
       clearTimeout(timer)
@@ -324,113 +245,99 @@ export async function fetchUsdcUsdBybit(): Promise<SourceResult> {
 }
 
 // ---------------------------------------------------------------------------
-// NGN / USDT sources  (Leg B -- routed via CF Worker for Nigerian IP)
+// NGN / USD sources  (Leg B)
 // ---------------------------------------------------------------------------
+//
+// All three sources work from any server IP -- no geo-restrictions,
+// no API keys required.
+//
+// Source                Update freq   Cache TTL   Notes
+// --------------------  -----------   ---------   -------------------------
+// CoinGecko USDT/NGN    Real-time     none        Crypto market rate; ~30 req/min free
+// ExchangeRate-API      Daily         24 hours    Official FX mid-market rate
+// CurrencyAPI           Daily         1 hour      jsDelivr CDN, effectively unlimited
+//
+// Quorum: 2 of 3 sources required.
 
-/**
- * Binance P2P: NGN/USDT buy-side median.
- * Routes through CF Worker relay for Nigerian IP geo-bypass.
- * cfWorkerUrl: set CF_WORKER_URL in .env (your Cloudflare Worker URL).
- */
-export async function fetchNgnUsdtBinanceP2P(cfWorkerUrl: string): Promise<SourceResult> {
-  await limiters['BinanceP2P'].acquire()
-  const body = {
-    asset: 'USDT',
-    fiat: 'NGN',
-    tradeType: 'SELL',
-    page: 1,
-    rows: 10,
-    publisherType: null,
-    payTypes: [],
-  }
-  const data = await cfFetch(
-    cfWorkerUrl,
-    'https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search',
-    'BinanceP2P',
-    { method: 'POST', body, timeoutMs: 12_000 }
-  ) as { data: Array<{ adv: { price: string } }> }
+// Response cache for sources that update less frequently than our 30s cycle.
+interface CacheEntry { result: SourceResult; expiresAt: number }
+const fxCache: Record<string, CacheEntry> = {}
 
-  if (!data.data?.length) throw new Error('BinanceP2P: no active ads returned')
-  const prices = data.data
-    .slice(0, 5)
-    .map((ad) => parseFloat(ad.adv.price))
-    .filter((p) => Number.isFinite(p) && p > 0)
-  if (prices.length === 0) throw new Error('BinanceP2P: could not parse any prices')
-  const value = median(prices)
-  assertBounds(value, NGN_USDT_MIN, NGN_USDT_MAX, 'BinanceP2P NGN/USDT')
-  return { source: 'BinanceP2P', value, fetchedAt: Date.now() }
+function getCached(key: string): SourceResult | null {
+  const entry = fxCache[key]
+  if (entry && Date.now() < entry.expiresAt) return entry.result
+  return null
 }
 
+function setCached(key: string, result: SourceResult, ttlMs: number): void {
+  fxCache[key] = { result, expiresAt: Date.now() + ttlMs }
+}
+
+const H24 = 24 * 60 * 60 * 1000
+const H1  =      60 * 60 * 1000
+
 /**
- * Quidax: NGN/USDT last trade price.
- * Nigerian exchange -- direct reflection of local market conditions.
+ * CoinGecko: USDT/NGN market price.
+ * Called every cycle -- reflects the real-time crypto market rate of USDT in NGN.
+ * Free public API, no key, works from any server IP.
+ * Free tier: ~30 requests/minute shared per IP. At a 30s cycle we use 2 req/min.
  */
-export async function fetchNgnUsdtQuidax(cfWorkerUrl: string): Promise<SourceResult> {
-  await limiters['Quidax'].acquire()
-  const data = await cfFetch(
-    cfWorkerUrl,
-    'https://www.quidax.com/api/v1/markets/tickers/usdtngn',
-    'Quidax',
+export async function fetchNgnUsdtCoinGecko(): Promise<SourceResult> {
+  await limiters['CoinGecko'].acquire()
+  const data = await fetchJson<{ tether: { ngn: number } }>(
+    'https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=ngn',
+    'CoinGecko',
     { timeoutMs: 10_000 }
-  ) as { data: { ticker: { last: string } } }
-  const raw = data.data?.ticker?.last
-  if (!raw) throw new Error('Quidax: missing ticker.last in response')
-  const value = parseFloat(raw)
-  assertBounds(value, NGN_USDT_MIN, NGN_USDT_MAX, 'Quidax NGN/USDT')
-  return { source: 'Quidax', value, fetchedAt: Date.now() }
+  )
+  const value = data.tether?.ngn
+  if (!value || !Number.isFinite(value)) throw new Error('CoinGecko: missing tether.ngn in response')
+  assertBounds(value, NGN_USDT_MIN, NGN_USDT_MAX, 'CoinGecko NGN/USDT')
+  return { source: 'CoinGecko', value, fetchedAt: Date.now() }
 }
 
 /**
- * Bybit P2P: NGN/USDT buy-side median from active sell ads.
+ * ExchangeRate-API (open.er-api.com): USD/NGN official FX mid-market rate.
+ * Free, no API key, works from any server IP.
+ * Data updates once per 24 hours -- cached for 24h to avoid rate-limit bans.
  */
-export async function fetchNgnUsdtBybitP2P(cfWorkerUrl: string): Promise<SourceResult> {
-  await limiters['BybitP2P'].acquire()
-  const data = await cfFetch(
-    cfWorkerUrl,
-    'https://api2.bybit.com/fiat/otc/item/online?userId=&tokenId=USDT&currencyId=NGN&payment=&side=1&size=10&page=1&amount=',
-    'BybitP2P',
-    { timeoutMs: 12_000 }
-  ) as { result: { items: Array<{ price: string }> } }
-
-  const items = data.result?.items
-  if (!items?.length) throw new Error('BybitP2P: no active ads')
-  const prices = items
-    .slice(0, 5)
-    .map((item) => parseFloat(item.price))
-    .filter((p) => Number.isFinite(p) && p > 0)
-  if (prices.length === 0) throw new Error('BybitP2P: could not parse prices')
-  const value = median(prices)
-  assertBounds(value, NGN_USDT_MIN, NGN_USDT_MAX, 'BybitP2P NGN/USDT')
-  return { source: 'BybitP2P', value, fetchedAt: Date.now() }
+export async function fetchNgnUsdtExchangeRateApi(): Promise<SourceResult> {
+  const cached = getCached('ExchangeRateApi')
+  if (cached) return cached
+  await limiters['ExchangeRateApi'].acquire()
+  const data = await fetchJson<{ rates: { NGN: number } }>(
+    'https://open.er-api.com/v6/latest/USD',
+    'ExchangeRateApi',
+    { timeoutMs: 10_000 }
+  )
+  const value = data.rates?.NGN
+  if (!value || !Number.isFinite(value)) throw new Error('ExchangeRateApi: missing rates.NGN in response')
+  assertBounds(value, NGN_USDT_MIN, NGN_USDT_MAX, 'ExchangeRateApi NGN/USD')
+  const result: SourceResult = { source: 'ExchangeRateApi', value, fetchedAt: Date.now() }
+  setCached('ExchangeRateApi', result, H24)
+  return result
 }
 
 /**
- * Bitget P2P: NGN/USDT buy-side median.
- * Requires BITGET_API_KEY (free Bitget account). Skipped gracefully if not set.
+ * CurrencyAPI (via jsDelivr CDN): USD/NGN aggregated FX rate.
+ * Open-source currency API served from Cloudflare CDN. No API key, no rate limits.
+ * Data updates daily -- cached for 1h; CDN serves stale until next daily push.
+ * Fallback URL: https://latest.currency-api.pages.dev/v1/currencies/usd.json
  */
-export async function fetchNgnUsdtBitgetP2P(apiKey: string, cfWorkerUrl: string): Promise<SourceResult> {
-  if (!apiKey) throw new Error('BitgetP2P: BITGET_API_KEY not set -- source skipped')
-  await limiters['BitgetP2P'].acquire()
-  const data = await cfFetch(
-    cfWorkerUrl,
-    'https://api.bitget.com/api/v3/p2p/ad-list?token=USDT&fiat=NGN&side=sell&pageNum=1&limit=10',
-    'BitgetP2P',
-    {
-      timeoutMs: 12_000,
-      headers: { 'ACCESS-KEY': apiKey },
-    }
-  ) as { data: Array<{ price: string }> }
-
-  const list = data.data
-  if (!list?.length) throw new Error('BitgetP2P: no active ads')
-  const prices = list
-    .slice(0, 5)
-    .map((ad) => parseFloat(ad.price))
-    .filter((p) => Number.isFinite(p) && p > 0)
-  if (prices.length === 0) throw new Error('BitgetP2P: could not parse prices')
-  const value = median(prices)
-  assertBounds(value, NGN_USDT_MIN, NGN_USDT_MAX, 'BitgetP2P NGN/USDT')
-  return { source: 'BitgetP2P', value, fetchedAt: Date.now() }
+export async function fetchNgnUsdtCurrencyApi(): Promise<SourceResult> {
+  const cached = getCached('CurrencyApi')
+  if (cached) return cached
+  await limiters['CurrencyApi'].acquire()
+  const data = await fetchJson<{ usd: { ngn: number } }>(
+    'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json',
+    'CurrencyApi',
+    { timeoutMs: 10_000 }
+  )
+  const value = data.usd?.ngn
+  if (!value || !Number.isFinite(value)) throw new Error('CurrencyApi: missing usd.ngn in response')
+  assertBounds(value, NGN_USDT_MIN, NGN_USDT_MAX, 'CurrencyApi NGN/USD')
+  const result: SourceResult = { source: 'CurrencyApi', value, fetchedAt: Date.now() }
+  setCached('CurrencyApi', result, H1)
+  return result
 }
 
 // ---------------------------------------------------------------------------

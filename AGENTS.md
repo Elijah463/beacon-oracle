@@ -32,8 +32,8 @@
 | Circle reporter wallet | Set after setup-reporter-wallet.ts | Yes -- managed by Circle SDK |
 
 ## Architecture
-- Off-chain reporter (scripts/reporter.ts) fetches USDC/USD (5 CEX sources) and NGN/USDT (4 P2P sources)
-- Derives USDC/NGN = median(USDC/USD) x median(NGN/USDT) using BigInt arithmetic
+- Off-chain reporter (scripts/reporter.ts) fetches USDC/USD (5 CEX sources) and NGN/USD (3 server-friendly sources: CoinGecko USDT/NGN live, ExchangeRate-API cached 24h, CurrencyAPI cached 1h)
+- Derives USDC/NGN = median(USDC/USD) x median(NGN/USD) using BigInt arithmetic
 - Signs the payload with REPORTER_SIGNING_KEY, submits via Circle developer-controlled wallet
 - Contract verifies ECDSA signature on-chain before writing each round
 - Chainlink AggregatorV3Interface compatible: latestRoundData(), getRoundData(), quoteUSDCToNGN(), quoteNGNToUSDC()
