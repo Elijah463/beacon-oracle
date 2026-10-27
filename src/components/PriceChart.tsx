@@ -1,161 +1,350 @@
 /**
  * PriceChart.tsx
- * Recharts area chart for USDC/NGN price history.
- * Clean light-theme styling matching BEACON brand.
+ * Canvas-based USDC/NGN price chart.
+ * - Y-axis: 0, 1000, 1200, 1400, 1600, then actual price
+ * - Line animates drawing left-to-right from zero on mount
+ * - No X-axis labels -- hover/tap shows a tooltip that fades after 10s
+ * - Brand-green gradient fill directly under the line
+ * - No Recharts -- pure canvas for full control
  */
 
-import {
-  AreaChart, Area, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from 'recharts'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import type { RoundPoint } from '@/hooks/useOracle'
 
 interface PriceChartProps {
   history: RoundPoint[]
-  price: number | null
+  price:   number | null
   loading: boolean
 }
 
-interface TooltipPayloadItem {
-  value: number
-  payload: { roundId: number; updatedAt: number }
+interface TooltipState {
+  price:     number
+  time:      string
+  x:         number
+  y:         number
+  visible:   boolean
+  opacity:   number
 }
 
-function CustomTooltip({ active, payload }: { active?: boolean; payload?: TooltipPayloadItem[] }) {
-  if (!active || !payload?.length) return null
-  const d = payload[0]
-  return (
-    <div style={{
-      background: 'rgba(6,10,18,0.92)',
-      border: '1px solid rgba(0,214,111,0.25)',
-      borderRadius: 10, padding: '8px 14px',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
-      fontFamily: 'DM Sans, sans-serif',
-    }}>
-      <p style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 700, margin: 0, fontVariantNumeric: 'tabular-nums' }}>
-        {d.value.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} NGN
-      </p>
-      <p style={{ color: '#64748b', fontSize: 11, margin: '3px 0 0' }}>
-        {new Date(d.payload.updatedAt * 1000).toLocaleTimeString()}
-      </p>
-    </div>
-  )
+const Y_TICKS = [0, 1000, 1200, 1400, 1600]
+const BRAND   = '#00D66F'
+const PAD_L   = 56   // left padding for Y-axis labels
+const PAD_R   = 12
+const PAD_T   = 16
+const PAD_B   = 12
+
+function buildYAxis(maxPrice: number) {
+  const base = [...Y_TICKS]
+  // Add actual price tick if it is above 1600
+  const ceiling = Math.ceil(maxPrice / 50) * 50
+  if (ceiling > 1600) base.push(ceiling)
+  return base
+}
+
+function toCanvasY(val: number, yMin: number, yMax: number, h: number): number {
+  return PAD_T + (1 - (val - yMin) / (yMax - yMin)) * (h - PAD_T - PAD_B)
+}
+
+function toCanvasX(idx: number, total: number, w: number): number {
+  if (total <= 1) return PAD_L + (w - PAD_L - PAD_R) / 2
+  return PAD_L + (idx / (total - 1)) * (w - PAD_L - PAD_R)
 }
 
 export function PriceChart({ history, price: _price, loading }: PriceChartProps) {
+  const canvasRef   = useRef<HTMLCanvasElement>(null)
+  const progressRef = useRef(0)      // 0..1 draw progress
+  const rafRef      = useRef<number>(0)
+  const timerRef    = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const fadeRef     = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null)
+
+  const draw = useCallback((progress: number) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const w = canvas.width
+    const h = canvas.height
+    const dpr = window.devicePixelRatio || 1
+
+    ctx.clearRect(0, 0, w, h)
+
+    if (history.length < 2) return
+
+    const prices  = history.map(r => r.price)
+    const maxP    = Math.max(...prices)
+    const yTicks  = buildYAxis(maxP)
+    const yMin    = 0
+    const yMax    = yTicks[yTicks.length - 1]
+
+    // ── Y-axis grid lines + labels ──────────────────────────────────────
+    ctx.font = `${10 * dpr}px DM Sans, sans-serif`
+    ctx.textAlign = 'right'
+    for (const tick of yTicks) {
+      if (tick === 0) continue   // skip zero label, keep gridline
+      const cy = toCanvasY(tick, yMin, yMax, h)
+      // gridline
+      ctx.beginPath()
+      ctx.strokeStyle = 'rgba(255,255,255,0.05)'
+      ctx.lineWidth   = 1
+      ctx.moveTo(PAD_L, cy)
+      ctx.lineTo(w - PAD_R, cy)
+      ctx.stroke()
+      // label
+      ctx.fillStyle = 'rgba(100,116,139,0.9)'
+      ctx.fillText(
+        tick >= 1000 ? `${(tick / 1000).toFixed(tick % 1000 === 0 ? 0 : 1)}k` : String(tick),
+        PAD_L - 6,
+        cy + 4,
+      )
+    }
+
+    // ── Build point list, animated by progress ──────────────────────────
+    const total  = history.length
+    // How many full segments to draw: progress * (total-1) segments
+    const segMax = progress * (total - 1)
+    const points: Array<{ cx: number; cy: number }> = []
+
+    for (let i = 0; i <= total - 1; i++) {
+      if (i > segMax) break
+      points.push({
+        cx: toCanvasX(i, total, w),
+        cy: toCanvasY(history[i].price, yMin, yMax, h),
+      })
+    }
+
+    // Partial last segment
+    const fullSegs  = Math.floor(segMax)
+    if (fullSegs < total - 1) {
+      const frac = segMax - fullSegs
+      const a    = points[points.length - 1] ?? { cx: PAD_L, cy: toCanvasY(0, yMin, yMax, h) }
+      const bx   = toCanvasX(fullSegs + 1, total, w)
+      const by   = toCanvasY(history[fullSegs + 1].price, yMin, yMax, h)
+      points.push({ cx: a.cx + (bx - a.cx) * frac, cy: a.cy + (by - a.cy) * frac })
+    }
+
+    if (points.length < 2) return
+
+    const lastPt = points[points.length - 1]
+    const baseY  = toCanvasY(0, yMin, yMax, h)
+
+    // ── Gradient fill ───────────────────────────────────────────────────
+    const grad = ctx.createLinearGradient(0, PAD_T, 0, baseY)
+    grad.addColorStop(0,   'rgba(0,214,111,0.30)')
+    grad.addColorStop(0.6, 'rgba(0,214,111,0.08)')
+    grad.addColorStop(1,   'rgba(0,214,111,0.00)')
+
+    ctx.beginPath()
+    ctx.moveTo(points[0].cx, baseY)
+    ctx.lineTo(points[0].cx, points[0].cy)
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1]
+      const curr = points[i]
+      const cpx  = (prev.cx + curr.cx) / 2
+      ctx.bezierCurveTo(cpx, prev.cy, cpx, curr.cy, curr.cx, curr.cy)
+    }
+    ctx.lineTo(lastPt.cx, baseY)
+    ctx.closePath()
+    ctx.fillStyle = grad
+    ctx.fill()
+
+    // ── Line ────────────────────────────────────────────────────────────
+    ctx.beginPath()
+    ctx.moveTo(points[0].cx, points[0].cy)
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1]
+      const curr = points[i]
+      const cpx  = (prev.cx + curr.cx) / 2
+      ctx.bezierCurveTo(cpx, prev.cy, cpx, curr.cy, curr.cx, curr.cy)
+    }
+    ctx.strokeStyle = BRAND
+    ctx.lineWidth   = 2.5
+    ctx.lineJoin    = 'round'
+    ctx.stroke()
+
+    // ── Tip dot ─────────────────────────────────────────────────────────
+    if (progress >= 1) {
+      ctx.beginPath()
+      ctx.arc(lastPt.cx, lastPt.cy, 4, 0, Math.PI * 2)
+      ctx.fillStyle   = BRAND
+      ctx.shadowColor = BRAND
+      ctx.shadowBlur  = 8
+      ctx.fill()
+      ctx.shadowBlur  = 0
+    }
+  }, [history])
+
+  // Animate draw-on
+  useEffect(() => {
+    if (history.length < 2) return
+    progressRef.current = 0
+    const start = performance.now()
+    const duration = Math.min(1200 + history.length * 80, 2400)
+
+    const step = (now: number) => {
+      const t = Math.min((now - start) / duration, 1)
+      // Ease out cubic
+      progressRef.current = 1 - Math.pow(1 - t, 3)
+      draw(progressRef.current)
+      if (t < 1) rafRef.current = requestAnimationFrame(step)
+    }
+    rafRef.current = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [history, draw])
+
+  // Resize
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const obs = new ResizeObserver(() => {
+      const dpr = window.devicePixelRatio || 1
+      canvas.width  = canvas.offsetWidth  * dpr
+      canvas.height = canvas.offsetHeight * dpr
+      const ctx = canvas.getContext('2d')
+      if (ctx) ctx.scale(dpr, dpr)
+      draw(progressRef.current)
+    })
+    obs.observe(canvas)
+    return () => obs.disconnect()
+  }, [draw])
+
+  // Hit-test on hover/touch
+  const handlePointer = useCallback((clientX: number, _clientY: number) => {
+    if (history.length < 2) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const rect  = canvas.getBoundingClientRect()
+    const mx    = clientX - rect.left
+    const w     = rect.width
+    const h     = rect.height
+    const prices = history.map(r => r.price)
+    const maxP   = Math.max(...prices)
+    const yTicks = buildYAxis(maxP)
+    const yMin   = 0
+    const yMax   = yTicks[yTicks.length - 1]
+
+    // Find closest point
+    let best = 0, bestDist = Infinity
+    for (let i = 0; i < history.length; i++) {
+      const cx = toCanvasX(i, history.length, w)
+      const d  = Math.abs(cx - mx)
+      if (d < bestDist) { bestDist = d; best = i }
+    }
+
+    const pt = history[best]
+    const cx = toCanvasX(best, history.length, w)
+    const cy = toCanvasY(pt.price, yMin, yMax, h)
+
+    // Clear existing fade timer
+    if (timerRef.current) clearTimeout(timerRef.current)
+    if (fadeRef.current)  clearInterval(fadeRef.current)
+
+    setTooltip({
+      price:   pt.price,
+      time:    new Date(pt.updatedAt * 1000).toLocaleTimeString(),
+      x:       cx,
+      y:       cy,
+      visible: true,
+      opacity: 1,
+    })
+
+    // Auto-fade after 10s
+    timerRef.current = setTimeout(() => {
+      let op = 1
+      fadeRef.current = setInterval(() => {
+        op -= 0.05
+        if (op <= 0) {
+          clearInterval(fadeRef.current!)
+          setTooltip(null)
+        } else {
+          setTooltip(prev => prev ? { ...prev, opacity: op } : null)
+        }
+      }, 40)
+    }, 10000)
+  }, [history])
+
+  const onMouseMove  = (e: React.MouseEvent)  => handlePointer(e.clientX, e.clientY)
+  const onTouchStart = (e: React.TouchEvent)  => {
+    e.preventDefault()
+    handlePointer(e.touches[0].clientX, e.touches[0].clientY)
+  }
+
   if (loading) {
     return (
-      <div
-        className="rounded-2xl p-6"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
-      >
-        <div className="h-4 w-36 rounded animate-pulse mb-4" style={{ background: 'var(--bg-muted)' }} />
-        <div className="h-52 rounded-xl animate-pulse" style={{ background: 'var(--bg-muted)' }} />
+      <div style={{ borderRadius: 18, padding: 24, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+        <div style={{ height: 16, width: 140, background: 'var(--bg-muted)', borderRadius: 6, marginBottom: 16, animation: 'shimmer 1.5s infinite' }} />
+        <div style={{ height: 220, background: 'var(--bg-muted)', borderRadius: 10, animation: 'shimmer 1.5s infinite' }} />
       </div>
     )
   }
 
   if (history.length < 2) {
     return (
-      <div
-        className="rounded-2xl p-6 flex flex-col"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
-      >
+      <div style={{ borderRadius: 18, padding: 24, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
         <Header count={0} />
-        <div className="flex-1 flex items-center justify-center h-52">
-          <div className="text-center">
-            <EmptyChartSVG />
-            <p className="text-sm mt-3 font-medium" style={{ color: 'var(--muted)' }}>
-              Waiting for price rounds
-            </p>
-            <p className="text-xs mt-1" style={{ color: 'var(--subtle)' }}>
-              Chart populates once the reporter submits at least 2 rounds.
-            </p>
-          </div>
+        <div style={{ height: 220, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+            <rect width="40" height="40" rx="10" fill="var(--bg-muted)" />
+            <path d="M8 28L15 20L22 23L32 13" stroke="var(--border-strong)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="32" cy="13" r="2.5" fill="#00D66F" fillOpacity="0.5" />
+          </svg>
+          <p style={{ color: 'var(--muted)', fontSize: 13, fontWeight: 500, margin: 0 }}>Waiting for price rounds</p>
+          <p style={{ color: 'var(--subtle)', fontSize: 12, margin: 0 }}>Chart populates once 2 rounds are published.</p>
         </div>
       </div>
     )
   }
 
-  const data = history.map((r) => ({ ...r, price: r.price }))
-
-  const prices = data.map((d) => d.price)
-  const minP = Math.min(...prices)
-  const maxP = Math.max(...prices)
-  const pad = (maxP - minP) * 0.08 || maxP * 0.01
-
   return (
-    <div
-      className="rounded-2xl p-6"
-      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
-    >
+    <div style={{ borderRadius: 18, padding: 24, background: 'var(--bg-card)', border: '1px solid var(--border)', position: 'relative' }}>
       <Header count={history.length} />
 
-      <ResponsiveContainer width="100%" height={220}>
-        <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="beaconGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#00D66F" stopOpacity={0.28} />
-              <stop offset="100%" stopColor="#00D66F" stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
-
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-
-          <YAxis
-            domain={[minP - pad, maxP + pad]}
-            tickFormatter={(v: number) =>
-              v.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-            }
-            tick={{ fontSize: 10, fill: 'var(--subtle)', fontFamily: 'DM Sans, sans-serif' }}
-            axisLine={false}
-            tickLine={false}
-            width={64}
-          />
-
-          <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(0,214,111,0.3)', strokeWidth: 1 }} />
-
-          <Area
-            type="monotone"
-            dataKey="price"
-            stroke="#00D66F"
-            strokeWidth={2}
-            fill="url(#beaconGrad)"
-            dot={false}
-            activeDot={{ r: 4, fill: '#00D66F', strokeWidth: 2, stroke: '#fff' }}
-            isAnimationActive={false}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-
-
+      <div style={{ position: 'relative', height: 220 }}>
+        <canvas
+          ref={canvasRef}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'crosshair' }}
+          onMouseMove={onMouseMove}
+          onTouchStart={onTouchStart}
+        />
+        {tooltip && (
+          <div style={{
+            position:   'absolute',
+            left:       Math.min(tooltip.x + 10, 200),
+            top:        Math.max(tooltip.y - 44, 0),
+            pointerEvents: 'none',
+            opacity:    tooltip.opacity,
+            transition: 'opacity 0.08s linear',
+            background: 'rgba(6,10,18,0.93)',
+            border:     '1px solid rgba(0,214,111,0.28)',
+            borderRadius: 9,
+            padding:    '7px 12px',
+            boxShadow:  '0 4px 20px rgba(0,0,0,0.55)',
+          }}>
+            <p style={{ color: '#fff', fontSize: 13, fontWeight: 700, margin: 0, fontVariantNumeric: 'tabular-nums' }}>
+              {tooltip.price.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} NGN
+            </p>
+            <p style={{ color: '#64748b', fontSize: 11, margin: '2px 0 0' }}>{tooltip.time}</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
 function Header({ count }: { count: number }) {
   return (
-    <div className="flex items-center justify-between mb-4">
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
       <div>
-        <p className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'var(--subtle)', letterSpacing: '0.08em' }}>
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--subtle)', margin: 0 }}>
           Price History
         </p>
-        <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>USDC / NGN</p>
+        <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', margin: '3px 0 0', fontFamily: "'Space Grotesk', sans-serif" }}>
+          USDC / NGN
+        </p>
       </div>
       {count > 0 && (
-        <span style={{ fontSize: 11, color: 'var(--subtle)', fontFamily: 'DM Sans, sans-serif' }}>
-          {count} updates
-        </span>
+        <span style={{ fontSize: 11, color: 'var(--subtle)' }}>{count} updates</span>
       )}
     </div>
-  )
-}
-
-function EmptyChartSVG() {
-  return (
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto">
-      <rect width="48" height="48" rx="12" fill="var(--bg-muted)" />
-      <path d="M10 34 L18 24 L26 28 L38 16" stroke="var(--border-strong)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="38" cy="16" r="3" fill="#00D66F" fillOpacity="0.4" />
-    </svg>
   )
 }
