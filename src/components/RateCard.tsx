@@ -46,7 +46,7 @@ export function RateCard({ price, roundId, secondsAgo, isStale, loading, history
     ? price.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : null
 
-  const flashColor = flash === 'up' ? '#00D66F' : flash === 'down' ? '#EF4444' : 'inherit'
+  const flashColor = flash === 'up' ? '#00D66F' : flash === 'down' ? '#EF4444' : '#ffffff'
 
   return (
     <div style={{

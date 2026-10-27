@@ -5,8 +5,7 @@
  */
 
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ReferenceLine, ResponsiveContainer,
+  AreaChart, Area, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import type { RoundPoint } from '@/hooks/useOracle'
 
@@ -42,7 +41,7 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Toolti
   )
 }
 
-export function PriceChart({ history, price, loading }: PriceChartProps) {
+export function PriceChart({ history, price: _price, loading }: PriceChartProps) {
   if (loading) {
     return (
       <div
@@ -100,16 +99,7 @@ export function PriceChart({ history, price, loading }: PriceChartProps) {
             </linearGradient>
           </defs>
 
-          <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" vertical={false} />
-
-          <XAxis
-            dataKey="updatedAt"
-            tickFormatter={(v: number) => new Date(v * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            tick={{ fontSize: 10, fill: 'var(--subtle)', fontFamily: 'DM Sans, sans-serif' }}
-            axisLine={false}
-            tickLine={false}
-            minTickGap={40}
-          />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
 
           <YAxis
             domain={[minP - pad, maxP + pad]}
@@ -122,17 +112,7 @@ export function PriceChart({ history, price, loading }: PriceChartProps) {
             width={64}
           />
 
-          <Tooltip content={<CustomTooltip />} />
-
-          {price !== null && (
-            <ReferenceLine
-              y={price}
-              stroke="#00D66F"
-              strokeDasharray="4 4"
-              strokeWidth={1.5}
-              label={{ value: 'Live', position: 'insideTopRight', fill: '#00D66F', fontSize: 10 }}
-            />
-          )}
+          <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(0,214,111,0.3)', strokeWidth: 1 }} />
 
           <Area
             type="monotone"
@@ -147,9 +127,7 @@ export function PriceChart({ history, price, loading }: PriceChartProps) {
         </AreaChart>
       </ResponsiveContainer>
 
-      <p className="text-xs mt-2" style={{ color: 'var(--subtle)', fontFamily: 'DM Sans, sans-serif' }}>
-        NGN value per 1 USDC -- sourced from on-chain round history
-      </p>
+
     </div>
   )
 }
