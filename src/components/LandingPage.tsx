@@ -77,9 +77,9 @@ function OrderbookCanvas() {
           return {
             y:      j * 22 + 14,
             val:    usePrice ? val : fmtVol(),
-            alpha:  rand(0.04, 0.20),
+            alpha:  rand(0.18, 0.55),
             speed:  rand(0.0004, 0.0018),
-            color:  isAsk ? '#00D66F' : '#475569',
+            color:  isAsk ? '#00D66F' : '#94a3b8',
             isAsk,
           }
         }),
@@ -89,8 +89,8 @@ function OrderbookCanvas() {
     // Label overlay: show current pair top-right of canvas
     const drawLabel = () => {
       ctx.save()
-      ctx.globalAlpha = 0.22
-      ctx.font = 'bold 13px "JetBrains Mono", monospace'
+      ctx.globalAlpha = 0.7
+      ctx.font = 'bold 12px "JetBrains Mono", monospace'
       ctx.textAlign = 'right'
       ctx.fillStyle = '#00D66F'
       ctx.fillText(pairLabel, canvas.width - 16, 22)
@@ -113,7 +113,7 @@ function OrderbookCanvas() {
               const usePrice = Math.random() > 0.45
               const { val, isAsk } = fmtForPair(pair)
               row.val   = usePrice ? val : fmtVol()
-              row.color = isAsk ? '#00D66F' : '#475569'
+              row.color = isAsk ? '#00D66F' : '#94a3b8'
               row.isAsk = isAsk
             }
           }
@@ -135,7 +135,7 @@ function OrderbookCanvas() {
             const usePrice = Math.random() > 0.45
             const { val, isAsk } = fmtForPair(pair)
             row.val   = usePrice ? val : fmtVol()
-            row.color = isAsk ? '#00D66F' : '#475569'
+            row.color = isAsk ? '#00D66F' : '#94a3b8'
             row.isAsk = isAsk
           }
         }
@@ -378,25 +378,28 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
             Chainlink-compatible interface. Any smart contract can read it.
           </p>
 
-          {/* CTA panel with orderbook canvas behind it */}
-          <div style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
-            {/* Orderbook canvas layer */}
-            <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', borderRadius: 20 }}>
-              <OrderbookCanvas />
-            </div>
-            {/* Blur + tint overlay */}
+          {/* CTA panel: tall canvas window, buttons overlaid at the bottom */}
+          <div style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(0,214,111,0.18)', height: 320 }}>
+            {/* Full-height orderbook canvas */}
+            <OrderbookCanvas />
+
+            {/* Top fade so numbers don't compete with nothing */}
             <div style={{
-              position: 'absolute', inset: 0,
-              backdropFilter: 'blur(3px)',
-              background: 'linear-gradient(180deg, rgba(6,10,18,0.55) 0%, rgba(6,10,18,0.82) 100%)',
-              borderRadius: 20,
+              position: 'absolute', inset: 0, pointerEvents: 'none',
+              background: 'linear-gradient(180deg, rgba(6,10,18,0.4) 0%, transparent 35%, transparent 45%, rgba(6,10,18,0.72) 75%, rgba(6,10,18,0.92) 100%)',
             }} />
-            {/* Buttons on top */}
-            <div style={{ position: 'relative', zIndex: 2, padding: '32px 32px', display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+
+            {/* Buttons pinned to the bottom */}
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 2,
+              padding: '24px 32px 28px',
+              backdropFilter: 'blur(6px)',
+              display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center',
+            }}>
               <button onClick={onEnterDashboard} style={{ ...ctaBtn, padding: '14px 32px', fontSize: 15, gap: 8 }}>
                 View Live Price <ArrowRight size={16} />
               </button>
-              <button onClick={onOpenDocs} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '14px 28px', borderRadius: 10, border: '1.5px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.06)', color: '#e2e8f0', fontSize: 15, fontWeight: 500, cursor: 'pointer', backdropFilter: 'blur(4px)' }}>
+              <button onClick={onOpenDocs} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '14px 28px', borderRadius: 10, border: '1.5px solid rgba(255,255,255,0.22)', background: 'rgba(255,255,255,0.07)', color: '#e2e8f0', fontSize: 15, fontWeight: 500, cursor: 'pointer' }}>
                 <BookOpen size={16} /> Get Started
               </button>
             </div>
