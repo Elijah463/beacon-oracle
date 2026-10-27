@@ -433,7 +433,13 @@ async function refreshOnChainState(): Promise<void> {
       functionName: 'latestRound',
     })
 
-    firstRoundDone = roundId > 0n
+    // Extract the aggregator round counter from the lower 64 bits.
+    // After a UUPS upgrade the phaseId increments so latestRound() returns
+    // phaseId<<64 | 0, which is non-zero even though no round has been written yet.
+    // We must check the lower-64-bit counter (not the full encoded id) to determine
+    // whether any rounds actually exist.
+    const aggregatorCounter = BigInt(roundId) & BigInt('0xFFFFFFFFFFFFFFFF')
+    firstRoundDone = aggregatorCounter > 0n
     reporterState.firstRoundDone = firstRoundDone
 
     if (firstRoundDone) {
