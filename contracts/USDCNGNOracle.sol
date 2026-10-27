@@ -323,14 +323,19 @@ contract USDCNGNOracle is
 
     /**
      * @notice Submits a new oracle answer with an ECDSA signature over the payload.
-     * @dev The reporter must sign keccak256(abi.encodePacked(address(this), answer, timestamp, latestRoundIdCounter + 1))
-     *      with the reporter's private key. The contract verifies the signature matches the reporter address.
-     *      This ensures the exact payload was signed by the reporter and not tampered in transit.
+     * @dev Anyone may call this function; authorization is enforced entirely via ECDSA
+     *      signature verification. The caller (msg.sender) is the gas payer and may be
+     *      any address -- the signing key (reporter) authorizes the payload. This
+     *      separates the gas payer role from the reporter role: the Circle wallet pays
+     *      gas while the signing key provides payload integrity.
+     *      The reporter must sign keccak256(abi.encodePacked(address(this), answer, timestamp, latestRoundIdCounter + 1))
+     *      with the reporter private key. The contract recovers the signer and compares to
+     *      the stored reporter address.
      * @param answer    The reported USDC/NGN price with 8 decimals (must be > 0).
      * @param timestamp Data timestamp (must be >= last updatedAt, <= block.timestamp, within maxStaleness).
      * @param signature ECDSA signature (65 bytes) over keccak256(abi.encodePacked(address(this), answer, timestamp, latestRoundIdCounter + 1)).
      */
-    function transmit(int256 answer, uint256 timestamp, bytes calldata signature) external onlyReporter whenNotPaused {
+    function transmit(int256 answer, uint256 timestamp, bytes calldata signature) external whenNotPaused {
         if (circuitBreakerTripped) revert OracleErrors.CircuitBreakerActive();
         if (answer <= 0)           revert OracleErrors.InvalidAnswer();
 

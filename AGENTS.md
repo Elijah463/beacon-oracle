@@ -6,7 +6,7 @@
 | Field | Value |
 |---|---|
 | Proxy address | `0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797` |
-| Implementation | `0xe0e4894106B1e517752515D40601ec890262e0ea` |
+| Implementation | `0x71d2fe7ca6bb8ead42a5bde78d64a1bb07ea7779` (v7 -- transmit open to any sender, ECDSA-only auth) |
 | Owner wallet | `0xBA29b16Adbf5F1D7dD2CeD98fE57189388c65B76` |
 | Reporter signing address | `0xdCF40c61Cc7A1D9A9C7F90f0be80A05797757d7b` |
 | Deployed via | `forge script contracts/script/DeployBeacon.s.sol` |
