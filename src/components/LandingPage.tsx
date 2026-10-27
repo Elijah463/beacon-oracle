@@ -21,9 +21,9 @@ const EXPLORER    = `https://explorer.testnet.arc.io/address/${CONTRACT}`
 const SHORT_CONTRACT = `${CONTRACT.slice(0, 8)}...${CONTRACT.slice(-6)}`
 
 // ── Orderbook background canvas ────────────────────────────────────────────
-// Alternates between two pairs every 4 seconds:
-//   USDC/USD: prices 0.9990 - 1.0010
-//   NGN/USD:  prices 1300 - 1600
+// Alternates between USDC/USD and NGN/USD every 12 seconds.
+// Buy rows: #22c55e (plain green). Sell rows: #ef4444 (red).
+// All cells are fully replaced on pair switch -- no bleed-over values.
 function OrderbookCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -34,110 +34,106 @@ function OrderbookCanvas() {
     if (!ctx) return
 
     let raf: number
-    let pair: 'USDC/USD' | 'NGN/USD' = 'USDC/USD'
-    let pairSwitchAt = Date.now() + 4000
-    let pairLabel = 'USDC/USD'
+    type Pair = 'USDC/USD' | 'NGN/USD'
+    let pair: Pair = 'USDC/USD'
+    let pairSwitchAt = Date.now() + 12000  // 12 seconds per pair
 
-    type Row = { y: number; val: string; alpha: number; speed: number; color: string; isAsk: boolean }
-    type Col  = { x: number; rows: Row[] }
-    let cols: Col[] = []
+    type Row = {
+      y: number
+      price: string
+      size: string
+      alpha: number
+      speed: number
+      isBuy: boolean
+      flickerAt: number
+    }
+    let rows: Row[] = []
 
     const rand = (min: number, max: number) => Math.random() * (max - min) + min
 
-    const fmtForPair = (p: typeof pair) => {
+    // Generate a price value strictly for the given pair
+    const priceForPair = (p: Pair): string => {
       if (p === 'USDC/USD') {
-        // Tight spread around 1.0000
-        const base  = rand(0.9990, 1.0010)
-        const isAsk = Math.random() > 0.5
-        return { val: base.toFixed(4), isAsk }
-      } else {
-        // NGN market: 1300-1600 range
-        const base  = rand(1300, 1600)
-        const dp    = Math.random() > 0.5 ? 2 : 0
-        const isAsk = Math.random() > 0.5
-        return { val: base.toFixed(dp), isAsk }
+        return rand(0.9988, 1.0012).toFixed(4)
       }
+      // NGN/USD strictly 1300-1600
+      return rand(1300, 1600).toFixed(2)
     }
 
-    const fmtVol = () => rand(50, 50000).toFixed(0)
+    const sizeVal = () => {
+      const n = rand(10, 99999)
+      return n > 1000 ? n.toFixed(0) : n.toFixed(2)
+    }
+
+    const buildRows = (p: Pair) => {
+      const rowH  = 20
+      const count = Math.floor(canvas.height / rowH)
+      rows = Array.from({ length: count }, (_, j) => ({
+        y:        j * rowH + 14,
+        price:    priceForPair(p),
+        size:     sizeVal(),
+        alpha:    rand(0.22, 0.60),
+        speed:    rand(0.0005, 0.0020),
+        isBuy:    Math.random() > 0.5,
+        flickerAt: Date.now() + rand(800, 3200),
+      }))
+    }
 
     const resize = () => {
       canvas.width  = canvas.offsetWidth
       canvas.height = canvas.offsetHeight
-      init()
+      buildRows(pair)
     }
 
-    const init = () => {
-      const colCount = Math.floor(canvas.width / 120)
-      cols = Array.from({ length: colCount }, (_, i) => ({
-        x: (i + 0.5) * (canvas.width / colCount),
-        rows: Array.from({ length: Math.floor(canvas.height / 22) }, (_, j) => {
-          const usePrice = Math.random() > 0.45
-          const { val, isAsk } = fmtForPair(pair)
-          return {
-            y:      j * 22 + 14,
-            val:    usePrice ? val : fmtVol(),
-            alpha:  rand(0.18, 0.55),
-            speed:  rand(0.0004, 0.0018),
-            color:  isAsk ? '#00D66F' : '#94a3b8',
-            isAsk,
-          }
-        }),
-      }))
-    }
-
-    // Label overlay: show current pair top-right of canvas
     const drawLabel = () => {
       ctx.save()
-      ctx.globalAlpha = 0.7
-      ctx.font = 'bold 12px "JetBrains Mono", monospace'
+      ctx.globalAlpha = 0.65
+      ctx.font = 'bold 11px "JetBrains Mono", monospace'
       ctx.textAlign = 'right'
       ctx.fillStyle = '#00D66F'
-      ctx.fillText(pairLabel, canvas.width - 16, 22)
+      ctx.fillText(pair, canvas.width - 14, 20)
       ctx.restore()
     }
 
     let t = 0
     const draw = () => {
-      t += 1
+      t++
+      const now = Date.now()
 
-      // Switch pair every 4 seconds
-      if (Date.now() > pairSwitchAt) {
+      // Switch pair -- replace ALL rows immediately so no wrong values linger
+      if (now > pairSwitchAt) {
         pair = pair === 'USDC/USD' ? 'NGN/USD' : 'USDC/USD'
-        pairLabel = pair
-        pairSwitchAt = Date.now() + 4000
-        // Refresh ~40% of cells with new pair values
-        for (const col of cols) {
-          for (const row of col.rows) {
-            if (Math.random() > 0.6) {
-              const usePrice = Math.random() > 0.45
-              const { val, isAsk } = fmtForPair(pair)
-              row.val   = usePrice ? val : fmtVol()
-              row.color = isAsk ? '#00D66F' : '#94a3b8'
-              row.isAsk = isAsk
-            }
-          }
-        }
+        pairSwitchAt = now + 12000
+        buildRows(pair)
       }
 
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.font = '11px "JetBrains Mono", monospace'
-      ctx.textAlign = 'center'
 
-      for (const col of cols) {
-        for (const row of col.rows) {
-          const pulse = Math.sin(t * row.speed * 60 + row.y) * 0.5 + 0.5
-          ctx.globalAlpha = row.alpha * (0.5 + pulse * 0.5)
-          ctx.fillStyle   = row.color
-          ctx.fillText(row.val, col.x, row.y)
-          // Trickle refresh individual cells
-          if (t % 90 === 0 && Math.random() > 0.88) {
-            const usePrice = Math.random() > 0.45
-            const { val, isAsk } = fmtForPair(pair)
-            row.val   = usePrice ? val : fmtVol()
-            row.color = isAsk ? '#00D66F' : '#94a3b8'
-            row.isAsk = isAsk
-          }
+      const midX = canvas.width / 2
+      const priceX = midX - 12
+      const sizeX  = midX + 88
+
+      for (const row of rows) {
+        // Slow sinusoidal alpha pulse
+        const pulse = Math.sin(t * row.speed * 60 + row.y) * 0.5 + 0.5
+        ctx.globalAlpha = row.alpha * (0.45 + pulse * 0.55)
+
+        const buyColor  = '#22c55e'   // plain green for buy
+        const sellColor = '#ef4444'   // red for sell
+        ctx.fillStyle = row.isBuy ? buyColor : sellColor
+
+        ctx.textAlign = 'right'
+        ctx.fillText(row.price, priceX, row.y)
+        ctx.textAlign = 'left'
+        ctx.fillText(row.size,  sizeX,  row.y)
+
+        // Flicker individual rows on their own schedule
+        if (now > row.flickerAt) {
+          row.price    = priceForPair(pair)
+          row.size     = sizeVal()
+          row.isBuy    = Math.random() > 0.5
+          row.flickerAt = now + rand(600, 3000)
         }
       }
 
@@ -158,10 +154,7 @@ function OrderbookCanvas() {
   return (
     <canvas
       ref={canvasRef}
-      style={{
-        position: 'absolute', inset: 0, width: '100%', height: '100%',
-        pointerEvents: 'none',
-      }}
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
     />
   )
 }
