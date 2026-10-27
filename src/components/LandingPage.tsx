@@ -336,9 +336,9 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <BeaconLogo size={32} />
-            <span style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.01em' }}>BEACON</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <BeaconLogo size={30} />
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em', lineHeight: 1 }}>BEACON</span>
           </div>
           <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <button onClick={onOpenDocs} style={navBtn}>
@@ -355,16 +355,9 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
       </header>
 
       {/* Hero */}
-      <section style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '80px 24px 72px', overflow: 'hidden' }}>
-        <OrderbookCanvas />
+      <section style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '80px 24px 0' }}>
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: 720, width: '100%' }}>
 
-        {/* Radial vignette over canvas */}
-        <div style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: 'radial-gradient(ellipse 70% 80% at 50% 50%, rgba(6,10,18,0.25) 0%, rgba(6,10,18,0.88) 80%)',
-        }} />
-
-        <div style={{ position: 'relative', zIndex: 1, maxWidth: 720 }}>
           {/* Live badge */}
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(0,214,111,0.1)', border: '1px solid rgba(0,214,111,0.3)', borderRadius: 999, padding: '5px 16px', marginBottom: 40 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00D66F', display: 'inline-block', boxShadow: '0 0 6px #00D66F', animation: 'blink 2s ease-in-out infinite' }} />
@@ -379,23 +372,38 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
             <span style={{ color: '#00D66F' }}>for USDC/NGN</span>
           </h1>
 
-          <p style={{ fontSize: 17, lineHeight: 1.7, color: '#64748b', maxWidth: 560, margin: '0 auto 40px' }}>
+          <p style={{ fontSize: 17, lineHeight: 1.7, color: '#64748b', maxWidth: 560, margin: '0 auto 48px' }}>
             BEACON aggregates real-time exchange rate data across eight independent market sources,
             derives a tamper-resistant USDC/NGN price, and publishes it on-chain via a
             Chainlink-compatible interface. Any smart contract can read it.
           </p>
 
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button onClick={onEnterDashboard} style={{ ...ctaBtn, padding: '13px 28px', fontSize: 15, gap: 8 }}>
-              View Live Price <ArrowRight size={16} />
-            </button>
-            <button onClick={onOpenDocs} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '13px 26px', borderRadius: 10, border: '1.5px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#e2e8f0', fontSize: 15, fontWeight: 500, cursor: 'pointer' }}>
-              <BookOpen size={16} /> Get Started
-            </button>
+          {/* CTA panel with orderbook canvas behind it */}
+          <div style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+            {/* Orderbook canvas layer */}
+            <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', borderRadius: 20 }}>
+              <OrderbookCanvas />
+            </div>
+            {/* Blur + tint overlay */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              backdropFilter: 'blur(3px)',
+              background: 'linear-gradient(180deg, rgba(6,10,18,0.55) 0%, rgba(6,10,18,0.82) 100%)',
+              borderRadius: 20,
+            }} />
+            {/* Buttons on top */}
+            <div style={{ position: 'relative', zIndex: 2, padding: '32px 32px', display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button onClick={onEnterDashboard} style={{ ...ctaBtn, padding: '14px 32px', fontSize: 15, gap: 8 }}>
+                View Live Price <ArrowRight size={16} />
+              </button>
+              <button onClick={onOpenDocs} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '14px 28px', borderRadius: 10, border: '1.5px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.06)', color: '#e2e8f0', fontSize: 15, fontWeight: 500, cursor: 'pointer', backdropFilter: 'blur(4px)' }}>
+                <BookOpen size={16} /> Get Started
+              </button>
+            </div>
           </div>
 
           {/* Stats strip */}
-          <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap', justifyContent: 'center', marginTop: 60, paddingTop: 36, borderTop: '1px solid rgba(255,255,255,0.07)', width: '100%' }}>
+          <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap', justifyContent: 'center', marginTop: 56, paddingTop: 36, borderTop: '1px solid rgba(255,255,255,0.07)', width: '100%', marginBottom: 72 }}>
             {[
               { value: '8', label: 'Decimal precision' },
               { value: '0.2%', label: 'Deviation threshold' },
@@ -409,7 +417,7 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
             ))}
           </div>
         </div>
-        <style>{`.blink { animation: blink 2s ease-in-out infinite; } @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
+        <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
       </section>
 
       {/* Architecture section */}
@@ -516,9 +524,9 @@ export function LandingFooter({ onEnterDashboard, onOpenDocs }: { onEnterDashboa
       <div style={{ maxWidth: 1040, margin: '0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 40, marginBottom: 40 }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <BeaconLogo size={28} />
-              <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif" }}>BEACON</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <BeaconLogo size={26} />
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em', lineHeight: 1 }}>BEACON</span>
             </div>
             <p style={{ marginTop: 12, fontSize: 13, color: '#475569', lineHeight: 1.65, maxWidth: 200 }}>
               A USDC/NGN on-chain price oracle built on Arc. Chainlink-compatible. Upgradeable.

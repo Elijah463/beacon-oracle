@@ -37,9 +37,9 @@ export function OracleDashboard({ onBack }: OracleDashboardProps) {
         background: 'rgba(6,10,18,0.92)', backdropFilter: 'blur(16px)',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <BeaconLogo size={30} />
-          <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.01em' }}>BEACON</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <BeaconLogo size={28} />
+          <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em', lineHeight: 1 }}>BEACON</span>
           {onBack && (
             <button onClick={onBack} style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', padding: '4px 10px', borderRadius: 6 }}>
               Home
@@ -115,9 +115,9 @@ export function OracleDashboard({ onBack }: OracleDashboardProps) {
       {/* Dashboard footer */}
       <footer style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(6,10,18,0.95)', padding: '16px 24px' }}>
         <div style={{ maxWidth: 1152, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <BeaconLogo size={22} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.7)', fontFamily: "'Space Grotesk', sans-serif" }}>BEACON</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em', lineHeight: 1 }}>BEACON</span>
           </div>
           <a href={EXPLORER} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', textDecoration: 'none', fontFamily: "'JetBrains Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
             {CONTRACT_ADDRESS} <ExternalLink size={10} />

@@ -780,9 +780,9 @@ export function DocsPage({ onBack }: DocsPageProps) {
         padding: '0 24px', height: 60,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <BeaconLogo size={28} />
-          <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif" }}>BEACON</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em', lineHeight: 1 }}>BEACON</span>
           <span style={{ color: '#334155', fontSize: 14, marginLeft: 2 }}>/</span>
           <span style={{ color: '#64748b', fontSize: 14, fontWeight: 500 }}>Docs</span>
         </div>
