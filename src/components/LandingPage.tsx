@@ -21,6 +21,9 @@ const EXPLORER    = `https://explorer.testnet.arc.io/address/${CONTRACT}`
 const SHORT_CONTRACT = `${CONTRACT.slice(0, 8)}...${CONTRACT.slice(-6)}`
 
 // ── Orderbook background canvas ────────────────────────────────────────────
+// Alternates between two pairs every 4 seconds:
+//   USDC/USD: prices 0.9990 - 1.0010
+//   NGN/USD:  prices 1300 - 1600
 function OrderbookCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -31,7 +34,32 @@ function OrderbookCanvas() {
     if (!ctx) return
 
     let raf: number
-    let cols: { x: number; rows: { y: number; val: string; alpha: number; speed: number; color: string }[] }[] = []
+    let pair: 'USDC/USD' | 'NGN/USD' = 'USDC/USD'
+    let pairSwitchAt = Date.now() + 4000
+    let pairLabel = 'USDC/USD'
+
+    type Row = { y: number; val: string; alpha: number; speed: number; color: string; isAsk: boolean }
+    type Col  = { x: number; rows: Row[] }
+    let cols: Col[] = []
+
+    const rand = (min: number, max: number) => Math.random() * (max - min) + min
+
+    const fmtForPair = (p: typeof pair) => {
+      if (p === 'USDC/USD') {
+        // Tight spread around 1.0000
+        const base  = rand(0.9990, 1.0010)
+        const isAsk = Math.random() > 0.5
+        return { val: base.toFixed(4), isAsk }
+      } else {
+        // NGN market: 1300-1600 range
+        const base  = rand(1300, 1600)
+        const dp    = Math.random() > 0.5 ? 2 : 0
+        const isAsk = Math.random() > 0.5
+        return { val: base.toFixed(dp), isAsk }
+      }
+    }
+
+    const fmtVol = () => rand(50, 50000).toFixed(0)
 
     const resize = () => {
       canvas.width  = canvas.offsetWidth
@@ -39,27 +67,59 @@ function OrderbookCanvas() {
       init()
     }
 
-    const rand = (min: number, max: number) => Math.random() * (max - min) + min
-    const fmtPrice = () => (rand(1300, 1400)).toFixed(rand(0, 1) > 0.5 ? 2 : 4)
-    const fmtVol   = () => (rand(100, 99999)).toFixed(0)
-
     const init = () => {
-      const colCount = Math.floor(canvas.width / 110)
+      const colCount = Math.floor(canvas.width / 120)
       cols = Array.from({ length: colCount }, (_, i) => ({
         x: (i + 0.5) * (canvas.width / colCount),
-        rows: Array.from({ length: Math.floor(canvas.height / 22) }, (_, j) => ({
-          y: j * 22 + 14,
-          val: Math.random() > 0.5 ? fmtPrice() : fmtVol(),
-          alpha: rand(0.04, 0.18),
-          speed: rand(0.0005, 0.002),
-          color: Math.random() > 0.55 ? '#00D66F' : '#334155',
-        })),
+        rows: Array.from({ length: Math.floor(canvas.height / 22) }, (_, j) => {
+          const usePrice = Math.random() > 0.45
+          const { val, isAsk } = fmtForPair(pair)
+          return {
+            y:      j * 22 + 14,
+            val:    usePrice ? val : fmtVol(),
+            alpha:  rand(0.04, 0.20),
+            speed:  rand(0.0004, 0.0018),
+            color:  isAsk ? '#00D66F' : '#475569',
+            isAsk,
+          }
+        }),
       }))
+    }
+
+    // Label overlay: show current pair top-right of canvas
+    const drawLabel = () => {
+      ctx.save()
+      ctx.globalAlpha = 0.22
+      ctx.font = 'bold 13px "JetBrains Mono", monospace'
+      ctx.textAlign = 'right'
+      ctx.fillStyle = '#00D66F'
+      ctx.fillText(pairLabel, canvas.width - 16, 22)
+      ctx.restore()
     }
 
     let t = 0
     const draw = () => {
       t += 1
+
+      // Switch pair every 4 seconds
+      if (Date.now() > pairSwitchAt) {
+        pair = pair === 'USDC/USD' ? 'NGN/USD' : 'USDC/USD'
+        pairLabel = pair
+        pairSwitchAt = Date.now() + 4000
+        // Refresh ~40% of cells with new pair values
+        for (const col of cols) {
+          for (const row of col.rows) {
+            if (Math.random() > 0.6) {
+              const usePrice = Math.random() > 0.45
+              const { val, isAsk } = fmtForPair(pair)
+              row.val   = usePrice ? val : fmtVol()
+              row.color = isAsk ? '#00D66F' : '#475569'
+              row.isAsk = isAsk
+            }
+          }
+        }
+      }
+
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.font = '11px "JetBrains Mono", monospace'
       ctx.textAlign = 'center'
@@ -70,12 +130,18 @@ function OrderbookCanvas() {
           ctx.globalAlpha = row.alpha * (0.5 + pulse * 0.5)
           ctx.fillStyle   = row.color
           ctx.fillText(row.val, col.x, row.y)
-          if (t % 120 === 0 && Math.random() > 0.85) {
-            row.val   = Math.random() > 0.5 ? fmtPrice() : fmtVol()
-            row.color = Math.random() > 0.55 ? '#00D66F' : '#334155'
+          // Trickle refresh individual cells
+          if (t % 90 === 0 && Math.random() > 0.88) {
+            const usePrice = Math.random() > 0.45
+            const { val, isAsk } = fmtForPair(pair)
+            row.val   = usePrice ? val : fmtVol()
+            row.color = isAsk ? '#00D66F' : '#475569'
+            row.isAsk = isAsk
           }
         }
       }
+
+      drawLabel()
       ctx.globalAlpha = 1
       raf = requestAnimationFrame(draw)
     }
@@ -270,7 +336,10 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <BeaconLogo size={32} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <BeaconLogo size={32} />
+            <span style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.01em' }}>BEACON</span>
+          </div>
           <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <button onClick={onOpenDocs} style={navBtn}>
               <BookOpen size={14} /> Docs
@@ -447,8 +516,11 @@ export function LandingFooter({ onEnterDashboard, onOpenDocs }: { onEnterDashboa
       <div style={{ maxWidth: 1040, margin: '0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 40, marginBottom: 40 }}>
           <div>
-            <BeaconLogo size={28} />
-            <p style={{ marginTop: 12, fontSize: 13, color: '#334155', lineHeight: 1.65, maxWidth: 200 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <BeaconLogo size={28} />
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif" }}>BEACON</span>
+            </div>
+            <p style={{ marginTop: 12, fontSize: 13, color: '#475569', lineHeight: 1.65, maxWidth: 200 }}>
               A USDC/NGN on-chain price oracle built on Arc. Chainlink-compatible. Upgradeable.
             </p>
           </div>

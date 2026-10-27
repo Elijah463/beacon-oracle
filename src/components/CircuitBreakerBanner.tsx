@@ -1,7 +1,7 @@
 /**
  * CircuitBreakerBanner.tsx -- no framer-motion, CSS transition only.
  */
-import { AlertTriangle, CheckCircle2, PauseCircle } from 'lucide-react'
+import { AlertTriangle, PauseCircle } from 'lucide-react'
 
 interface CircuitBreakerBannerProps {
   tripped: boolean
@@ -33,12 +33,8 @@ export function CircuitBreakerBanner({ tripped, paused, circuitBreakerBps }: Cir
     </div>
   )
 
-  return (
-    <div style={bannerStyle('var(--success-bg)', 'var(--brand-border)', 'var(--success)')}>
-      <CheckCircle2 size={16} />
-      <span>Oracle healthy. Circuit breaker armed at {threshold}% max deviation per round.</span>
-    </div>
-  )
+  // Healthy state -- show nothing, no banner needed
+  return null
 }
 
 const mono: React.CSSProperties = {
