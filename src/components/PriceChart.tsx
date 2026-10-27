@@ -25,20 +25,17 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Toolti
   if (!active || !payload?.length) return null
   const d = payload[0]
   return (
-    <div
-      className="rounded-xl px-3 py-2 text-xs"
-      style={{
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border)',
-        boxShadow: 'var(--shadow-md)',
-        fontFamily: 'DM Sans, sans-serif',
-      }}
-    >
-      <p className="font-bold tabular-nums" style={{ color: 'var(--ink)', fontSize: '0.85rem' }}>
+    <div style={{
+      background: 'rgba(6,10,18,0.92)',
+      border: '1px solid rgba(0,214,111,0.25)',
+      borderRadius: 10, padding: '8px 14px',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+      fontFamily: 'DM Sans, sans-serif',
+    }}>
+      <p style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 700, margin: 0, fontVariantNumeric: 'tabular-nums' }}>
         {d.value.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} NGN
       </p>
-      <p style={{ color: 'var(--subtle)' }}>Round #{d.payload.roundId}</p>
-      <p style={{ color: 'var(--subtle)' }}>
+      <p style={{ color: '#64748b', fontSize: 11, margin: '3px 0 0' }}>
         {new Date(d.payload.updatedAt * 1000).toLocaleTimeString()}
       </p>
     </div>
@@ -98,19 +95,20 @@ export function PriceChart({ history, price, loading }: PriceChartProps) {
         <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="beaconGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#00D66F" stopOpacity={0.18} />
-              <stop offset="100%" stopColor="#00D66F" stopOpacity={0} />
+              <stop offset="0%" stopColor="#00D66F" stopOpacity={0.28} />
+              <stop offset="100%" stopColor="#00D66F" stopOpacity={0.02} />
             </linearGradient>
           </defs>
 
           <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" vertical={false} />
 
           <XAxis
-            dataKey="roundId"
-            tickFormatter={(v: number) => `#${v}`}
-            tick={{ fontSize: 10, fill: 'var(--subtle)', fontFamily: 'JetBrains Mono, monospace' }}
+            dataKey="updatedAt"
+            tickFormatter={(v: number) => new Date(v * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            tick={{ fontSize: 10, fill: 'var(--subtle)', fontFamily: 'DM Sans, sans-serif' }}
             axisLine={false}
             tickLine={false}
+            minTickGap={40}
           />
 
           <YAxis
@@ -166,11 +164,8 @@ function Header({ count }: { count: number }) {
         <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>USDC / NGN</p>
       </div>
       {count > 0 && (
-        <span
-          className="text-xs px-2 py-1 rounded-full mono"
-          style={{ background: 'var(--bg-muted)', color: 'var(--subtle)' }}
-        >
-          {count} rounds
+        <span style={{ fontSize: 11, color: 'var(--subtle)', fontFamily: 'DM Sans, sans-serif' }}>
+          {count} updates
         </span>
       )}
     </div>

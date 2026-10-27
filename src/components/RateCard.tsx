@@ -89,7 +89,7 @@ export function RateCard({ price, roundId, secondsAgo, isStale, loading, history
         </p>
         {loading && price === null ? (
           <div style={{ height: 56, display: 'flex', alignItems: 'center' }}>
-            <div style={{ width: 220, height: 44, background: '#eef0f4', borderRadius: 8, animation: 'shimmer 1.5s infinite' }} />
+            <div style={{ width: 220, height: 44, background: 'var(--bg-muted)', borderRadius: 8, animation: 'shimmer 1.5s infinite' }} />
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>

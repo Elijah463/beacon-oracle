@@ -27,7 +27,7 @@ export function OracleDashboard({ onBack }: OracleDashboardProps) {
   const oracle = useOracle()
 
   return (
-    <div style={{ minHeight: '100dvh', background: '#060a12', display: 'flex', flexDirection: 'column' }}>
+    <div data-theme="dark" style={{ minHeight: '100dvh', background: '#060a12', display: 'flex', flexDirection: 'column' }}>
 
       {/* Sticky nav */}
       <nav style={{
