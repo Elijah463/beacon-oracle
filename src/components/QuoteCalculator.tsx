@@ -20,7 +20,7 @@ function formatNGN(raw: bigint): string {
   return (Number(raw) / 10 ** NGN_DECIMALS).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 function formatUSDC(raw: bigint): string {
-  return (Number(raw) / 10 ** USDC_DECIMALS).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })
+  return (Number(raw) / 10 ** USDC_DECIMALS).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 // Simple SVG circle logos

@@ -26,19 +26,48 @@ interface TooltipState {
   opacity:   number
 }
 
-const Y_TICKS = [0, 1000, 1200, 1400, 1600]
 const BRAND   = '#00D66F'
 const PAD_L   = 56   // left padding for Y-axis labels
 const PAD_R   = 12
 const PAD_T   = 16
 const PAD_B   = 12
 
-function buildYAxis(maxPrice: number) {
-  const base = [...Y_TICKS]
-  // Add actual price tick if it is above 1600
-  const ceiling = Math.ceil(maxPrice / 50) * 50
-  if (ceiling > 1600) base.push(ceiling)
-  return base
+/**
+ * Build a fully dynamic Y-axis.
+ * Strategy:
+ *   - yMin = floor of (minPrice - small pad) snapped to step
+ *   - yMax = ceil  of (maxPrice + small pad) snapped to step
+ *   - step = nice round number that gives 5-8 ticks across the range
+ *   - Always include 0 as the chart baseline (line draws from zero)
+ *     but the visible labels start from yMin so the detail is tight.
+ */
+function buildYAxis(minPrice: number, maxPrice: number): { ticks: number[]; yMin: number; yMax: number } {
+  const range = maxPrice - minPrice
+  // If all prices are identical (1 round), use a ±0.5% spread
+  const spread = range === 0 ? maxPrice * 0.01 : range
+
+  // Pick a step that gives roughly 5-7 visible ticks
+  const rawStep = spread / 5
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)))
+  const niceStep = (() => {
+    const ratio = rawStep / magnitude
+    if (ratio < 1.5) return magnitude
+    if (ratio < 3.5) return 2 * magnitude
+    if (ratio < 7.5) return 5 * magnitude
+    return 10 * magnitude
+  })()
+
+  const yMin = Math.max(0, Math.floor((minPrice - spread * 0.1) / niceStep) * niceStep)
+  const yMax = Math.ceil((maxPrice + spread * 0.1) / niceStep) * niceStep
+
+  const ticks: number[] = []
+  for (let t = yMin; t <= yMax + niceStep * 0.01; t += niceStep) {
+    ticks.push(Math.round(t))
+  }
+  // Always ensure yMax is in ticks
+  if (ticks[ticks.length - 1] < yMax) ticks.push(Math.round(yMax))
+
+  return { ticks, yMin, yMax }
 }
 
 function toCanvasY(val: number, yMin: number, yMax: number, h: number): number {
@@ -72,16 +101,15 @@ export function PriceChart({ history, price: _price, loading }: PriceChartProps)
     if (history.length < 2) return
 
     const prices  = history.map(r => r.price)
+    const minP    = Math.min(...prices)
     const maxP    = Math.max(...prices)
-    const yTicks  = buildYAxis(maxP)
-    const yMin    = 0
-    const yMax    = yTicks[yTicks.length - 1]
+    const { ticks: yTicks, yMin, yMax } = buildYAxis(minP, maxP)
 
     // ── Y-axis grid lines + labels ──────────────────────────────────────
     ctx.font = `${10 * dpr}px DM Sans, sans-serif`
     ctx.textAlign = 'right'
     for (const tick of yTicks) {
-      if (tick === 0) continue   // skip zero label, keep gridline
+      if (tick === yMin && yMin === 0) continue   // skip zero label when baseline is 0
       const cy = toCanvasY(tick, yMin, yMax, h)
       // gridline
       ctx.beginPath()
@@ -93,7 +121,9 @@ export function PriceChart({ history, price: _price, loading }: PriceChartProps)
       // label
       ctx.fillStyle = 'rgba(100,116,139,0.9)'
       ctx.fillText(
-        tick >= 1000 ? `${(tick / 1000).toFixed(tick % 1000 === 0 ? 0 : 1)}k` : String(tick),
+        tick >= 10000
+          ? `${(tick / 1000).toFixed(0)}k`
+          : tick.toLocaleString(),
         PAD_L - 6,
         cy + 4,
       )
@@ -126,7 +156,7 @@ export function PriceChart({ history, price: _price, loading }: PriceChartProps)
     if (points.length < 2) return
 
     const lastPt = points[points.length - 1]
-    const baseY  = toCanvasY(0, yMin, yMax, h)
+    const baseY  = toCanvasY(yMin, yMin, yMax, h)
 
     // ── Gradient fill ───────────────────────────────────────────────────
     const grad = ctx.createLinearGradient(0, PAD_T, 0, baseY)
@@ -218,10 +248,9 @@ export function PriceChart({ history, price: _price, loading }: PriceChartProps)
     const w     = rect.width
     const h     = rect.height
     const prices = history.map(r => r.price)
+    const minP   = Math.min(...prices)
     const maxP   = Math.max(...prices)
-    const yTicks = buildYAxis(maxP)
-    const yMin   = 0
-    const yMax   = yTicks[yTicks.length - 1]
+    const { yMin, yMax } = buildYAxis(minP, maxP)
 
     // Find closest point
     let best = 0, bestDist = Infinity

@@ -344,12 +344,6 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
       <section style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '80px 24px 0' }}>
         <div style={{ position: 'relative', zIndex: 1, maxWidth: 720, width: '100%' }}>
 
-          {/* Live badge */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(0,214,111,0.1)', border: '1px solid rgba(0,214,111,0.3)', borderRadius: 999, padding: '5px 16px', marginBottom: 40 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00D66F', display: 'inline-block', boxShadow: '0 0 6px #00D66F', animation: 'blink 2s ease-in-out infinite' }} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#00D66F', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Live on Arc Testnet</span>
-          </div>
-
           <PriceOrb />
 
           <h1 style={{ fontSize: 'clamp(34px,5.5vw,68px)', fontWeight: 900, lineHeight: 1.06, letterSpacing: '-0.03em', color: '#fff', marginBottom: 20, fontFamily: "'Space Grotesk', sans-serif" }}>
@@ -406,7 +400,6 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
             ))}
           </div>
         </div>
-        <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
       </section>
 
       {/* Architecture section */}
