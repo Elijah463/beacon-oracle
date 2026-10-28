@@ -14,10 +14,6 @@ const CONTRACT = '0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797'
 const EXPLORER = `https://explorer.testnet.arc.io/address/${CONTRACT}`
 const CHAIN_ID  = 5042002
 
-interface DocsPageProps {
-  onBack: () => void
-}
-
 // ── Copy button ────────────────────────────────────────────────────────────
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
@@ -757,7 +753,7 @@ event NewTransmission(
 ]
 
 // ── Main component ─────────────────────────────────────────────────────────
-export function DocsPage({ onBack }: DocsPageProps) {
+export function DocsPage() {
   const [activeIdx, setActiveIdx] = useState(0)
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -783,20 +779,7 @@ export function DocsPage({ onBack }: DocsPageProps) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <BeaconLogo size={28} />
           <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em', lineHeight: 1 }}>BEACON</span>
-          <span style={{ color: '#334155', fontSize: 14, marginLeft: 2 }}>/</span>
-          <span style={{ color: '#64748b', fontSize: 14, fontWeight: 500 }}>Docs</span>
         </div>
-        <button
-          onClick={onBack}
-          style={{
-            background: 'none', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 8, padding: '6px 14px', cursor: 'pointer',
-            color: '#94a3b8', fontSize: 13, fontWeight: 500,
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}
-        >
-          <ChevronLeft size={14} /> Back
-        </button>
       </header>
 
       <div style={{ display: 'flex', flex: 1, maxWidth: 1200, margin: '0 auto', width: '100%' }}>
@@ -877,19 +860,7 @@ export function DocsPage({ onBack }: DocsPageProps) {
                 </div>
                 <ChevronRight size={16} />
               </button>
-            ) : (
-              <button
-                onClick={onBack}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  background: '#00D66F', border: 'none',
-                  borderRadius: 10, padding: '10px 20px', cursor: 'pointer',
-                  color: '#fff', fontSize: 13.5, fontWeight: 600,
-                }}
-              >
-                Back to BEACON <ChevronRight size={16} />
-              </button>
-            )}
+            ) : null}
           </div>
         </main>
       </div>

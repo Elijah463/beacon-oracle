@@ -1,12 +1,13 @@
 /**
  * QuoteCalculator.tsx
- * On-chain quote panel. No framer-motion -- CSS transitions only.
+ * BEACON Converter -- swap-style UI for USDC/NGN on-chain quotes.
+ * No framer-motion. Pure CSS transitions.
  */
 
 import { useState, useCallback } from 'react'
 import { usePublicClient } from 'wagmi'
 import { arcTestnet } from 'viem/chains'
-import { ArrowLeftRight, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { ArrowUpDown, Loader2, AlertCircle } from 'lucide-react'
 import { ORACLE_ABI } from '@/lib/oracleAbi'
 
 const CONTRACT_ADDRESS = import.meta.env.VITE_ORACLE_CONTRACT_ADDRESS as `0x${string}`
@@ -15,167 +16,192 @@ const NGN_DECIMALS  = 2
 
 type Direction = 'usdc-to-ngn' | 'ngn-to-usdc'
 
-interface QuoteResult {
-  input:      string
-  output:     string
-  roundId:    number
-  ageSeconds: number
-  direction:  Direction
-}
-
 function formatNGN(raw: bigint): string {
   return (Number(raw) / 10 ** NGN_DECIMALS).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
-
 function formatUSDC(raw: bigint): string {
   return (Number(raw) / 10 ** USDC_DECIMALS).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })
 }
 
-function formatAge(secs: number): string {
-  if (secs < 60) return `${secs}s ago`
-  if (secs < 3600) return `${Math.floor(secs / 60)}m ${secs % 60}s ago`
-  return `${Math.floor(secs / 3600)}h ago`
+// Simple SVG circle logos
+function USDCIcon({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+      <circle cx="16" cy="16" r="16" fill="#2775CA" />
+      <path d="M16 6C10.477 6 6 10.477 6 16s4.477 10 10 10 10-4.477 10-10S21.523 6 16 6zm1.2 15.6v1.4h-2.4v-1.4c-2.16-.44-3.6-1.96-3.6-3.96h2.4c0 1.04.84 1.8 2.04 1.8 1.12 0 1.96-.68 1.96-1.64 0-.88-.6-1.44-2.04-1.88-2.16-.64-3.56-1.56-3.56-3.44 0-1.72 1.28-3.04 2.8-3.4V7.4h2.4v1.48c1.96.36 3.2 1.72 3.2 3.52h-2.4c0-.96-.72-1.6-1.8-1.6-1.04 0-1.8.56-1.8 1.4 0 .8.56 1.32 2 1.76 2.2.64 3.6 1.6 3.6 3.6 0 1.8-1.32 3.16-2.8 3.56z" fill="white" />
+    </svg>
+  )
+}
+function NGNIcon({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+      <circle cx="16" cy="16" r="16" fill="#008751" />
+      <text x="16" y="21" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold" fontFamily="sans-serif">₦</text>
+    </svg>
+  )
 }
 
 export function QuoteCalculator() {
   const [direction, setDirection]   = useState<Direction>('usdc-to-ngn')
   const [inputValue, setInputValue] = useState('')
   const [loading, setLoading]       = useState(false)
-  const [result, setResult]         = useState<QuoteResult | null>(null)
+  const [outputValue, setOutputValue] = useState<string | null>(null)
   const [error, setError]           = useState<string | null>(null)
+  const [flipping, setFlipping]     = useState(false)
 
   const publicClient = usePublicClient({ chainId: arcTestnet.id })
 
+  const fromCurrency = direction === 'usdc-to-ngn' ? 'USDC' : 'NGN'
+  const toCurrency   = direction === 'usdc-to-ngn' ? 'NGN'  : 'USDC'
+
   const flip = useCallback(() => {
-    setDirection((d) => d === 'usdc-to-ngn' ? 'ngn-to-usdc' : 'usdc-to-ngn')
-    setInputValue(''); setResult(null); setError(null)
+    setFlipping(true)
+    setTimeout(() => setFlipping(false), 300)
+    setDirection(d => d === 'usdc-to-ngn' ? 'ngn-to-usdc' : 'usdc-to-ngn')
+    setInputValue('')
+    setOutputValue(null)
+    setError(null)
   }, [])
 
-  const handleQuote = useCallback(async () => {
+  const handleConvert = useCallback(async () => {
     if (!publicClient) return
     const parsed = parseFloat(inputValue.replace(/,/g, ''))
     if (!isFinite(parsed) || parsed <= 0) { setError('Enter a valid positive amount.'); return }
-    setLoading(true); setError(null); setResult(null)
-
+    setLoading(true); setError(null); setOutputValue(null)
     try {
-      const metaCall = publicClient.readContract({ address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'latestQuoteMetadata' })
-
       if (direction === 'usdc-to-ngn') {
         const atomicIn = BigInt(Math.round(parsed * 10 ** USDC_DECIMALS))
-        const [quoteRes, metaRes] = await Promise.all([
-          publicClient.readContract({ address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'quoteUSDCToNGN', args: [atomicIn] }),
-          metaCall,
-        ])
-        const [rid, , , age] = metaRes as [bigint, bigint, bigint, bigint]
-        setResult({
-          input:      `${parsed.toLocaleString('en-US', { minimumFractionDigits: 2 })} USDC`,
-          output:     `${formatNGN(quoteRes)} NGN`,
-          roundId:    Number(rid),
-          ageSeconds: Number(age),
-          direction,
+        const result = await publicClient.readContract({
+          address: CONTRACT_ADDRESS, abi: ORACLE_ABI,
+          functionName: 'quoteUSDCToNGN', args: [atomicIn],
         })
+        setOutputValue(formatNGN(result))
       } else {
         const atomicIn = BigInt(Math.round(parsed * 10 ** NGN_DECIMALS))
-        const [quoteRes, metaRes] = await Promise.all([
-          publicClient.readContract({ address: CONTRACT_ADDRESS, abi: ORACLE_ABI, functionName: 'quoteNGNToUSDC', args: [atomicIn] }),
-          metaCall,
-        ])
-        const [rid, , , age] = metaRes as [bigint, bigint, bigint, bigint]
-        setResult({
-          input:      `${parsed.toLocaleString('en-NG', { minimumFractionDigits: 2 })} NGN`,
-          output:     `${formatUSDC(quoteRes)} USDC`,
-          roundId:    Number(rid),
-          ageSeconds: Number(age),
-          direction,
+        const result = await publicClient.readContract({
+          address: CONTRACT_ADDRESS, abi: ORACLE_ABI,
+          functionName: 'quoteNGNToUSDC', args: [atomicIn],
         })
+        setOutputValue(formatUSDC(result))
       }
     } catch (e) {
-      const msg = (e as Error).message ?? 'Quote failed'
-      if (msg.toLowerCase().includes('stale')) setError('Oracle price is stale. Submit a fresh round first.')
-      else if (msg.toLowerCase().includes('nodata') || msg.toLowerCase().includes('no data')) setError('No price data on-chain yet. Run the reporter to submit the first round.')
-      else if (msg.toLowerCase().includes('circuit')) setError('Circuit breaker is active. The oracle owner must reset it first.')
+      const msg = (e as Error).message ?? 'Conversion failed'
+      if (msg.toLowerCase().includes('stale'))   setError('Oracle price is stale.')
+      else if (msg.toLowerCase().includes('nodata') || msg.toLowerCase().includes('no data')) setError('No price data on-chain yet.')
+      else if (msg.toLowerCase().includes('circuit')) setError('Circuit breaker is active.')
       else setError(msg)
     } finally {
       setLoading(false)
     }
   }, [direction, inputValue, publicClient])
 
-  const inputCurrency = direction === 'usdc-to-ngn' ? 'USDC' : 'NGN'
-
   return (
-    <div style={{ borderRadius: 18, padding: '24px 26px', background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+    <div style={{
+      borderRadius: 20, padding: '24px',
+      background: 'var(--bg-card)', border: '1px solid var(--border)',
+      boxShadow: 'var(--shadow-sm)',
+    }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div>
-          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--subtle)', margin: 0 }}>On-Chain Quote</p>
-          <p style={{ fontSize: 13, color: 'var(--muted)', margin: '3px 0 0' }}>Computed directly by the smart contract</p>
-        </div>
-        <button onClick={flip} title="Flip direction" style={{ padding: 8, borderRadius: 10, background: 'var(--bg)', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--brand)', display: 'flex', alignItems: 'center' }}>
-          <ArrowLeftRight size={16} />
-        </button>
+      <div style={{ marginBottom: 20 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--subtle)', margin: 0 }}>Converter</p>
+        <p style={{ fontSize: 13, color: 'var(--muted)', margin: '3px 0 0' }}>Live on-chain rate</p>
       </div>
 
-      {/* Input row */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <div style={{ position: 'relative', flex: 1 }}>
-          <input
-            type="number" min="0" step="any"
-            value={inputValue}
-            onChange={(e) => { setInputValue(e.target.value); setError(null); setResult(null) }}
-            onKeyDown={(e) => { if (e.key === 'Enter') void handleQuote() }}
-            placeholder={`Amount in ${inputCurrency}`}
-            style={{
-              width: '100%', boxSizing: 'border-box',
-              padding: '12px 52px 12px 14px', borderRadius: 10,
-              background: 'var(--bg)', border: '1px solid var(--border)',
-              color: 'var(--ink)', fontSize: 14, fontFamily: "'JetBrains Mono', monospace",
-              outline: 'none',
-            }}
-          />
-          <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 12, fontWeight: 700, color: 'var(--brand)' }}>
-            {inputCurrency}
-          </span>
+      {/* From token */}
+      <div style={{
+        borderRadius: 14, padding: '14px 16px',
+        background: 'var(--bg-muted)', border: '1px solid var(--border)',
+        marginBottom: 2,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span style={{ fontSize: 12, color: 'var(--subtle)', fontWeight: 500 }}>From</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 999, padding: '4px 10px 4px 6px' }}>
+            {direction === 'usdc-to-ngn' ? <USDCIcon size={20} /> : <NGNIcon size={20} />}
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{fromCurrency}</span>
+          </div>
         </div>
+        <input
+          type="number" min="0" step="any"
+          value={inputValue}
+          onChange={e => { setInputValue(e.target.value); setError(null); setOutputValue(null) }}
+          onKeyDown={e => { if (e.key === 'Enter') void handleConvert() }}
+          placeholder="0.00"
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            background: 'none', border: 'none', outline: 'none',
+            fontSize: 28, fontWeight: 700, color: 'var(--ink)',
+            fontFamily: "'Space Grotesk', sans-serif",
+            letterSpacing: '-0.02em', padding: 0,
+          }}
+        />
+      </div>
+
+      {/* Flip arrow */}
+      <div style={{ display: 'flex', justifyContent: 'center', position: 'relative', zIndex: 1, margin: '-1px 0' }}>
         <button
-          onClick={() => void handleQuote()}
-          disabled={loading || !inputValue}
-          style={{ padding: '12px 20px', borderRadius: 10, background: 'var(--brand)', color: 'white', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, opacity: (loading || !inputValue) ? 0.45 : 1, transition: 'opacity .15s' }}
+          onClick={flip}
+          style={{
+            width: 36, height: 36, borderRadius: '50%',
+            background: 'var(--bg-card)', border: '2px solid var(--border)',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--brand)',
+            transform: flipping ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.3s ease',
+          }}
         >
-          {loading ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : 'Quote'}
+          <ArrowUpDown size={15} />
         </button>
       </div>
 
-      <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
-        {direction === 'usdc-to-ngn' ? 'Converting USDC to NGN using live on-chain rate' : 'Converting NGN to USDC using live on-chain rate'}
-        {' -- flip with arrows'}
-      </p>
+      {/* To token */}
+      <div style={{
+        borderRadius: 14, padding: '14px 16px',
+        background: 'var(--bg-muted)', border: '1px solid var(--border)',
+        marginTop: 2, marginBottom: 16,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span style={{ fontSize: 12, color: 'var(--subtle)', fontWeight: 500 }}>To</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 999, padding: '4px 10px 4px 6px' }}>
+            {direction === 'usdc-to-ngn' ? <NGNIcon size={20} /> : <USDCIcon size={20} />}
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{toCurrency}</span>
+          </div>
+        </div>
+        <div style={{
+          fontSize: 28, fontWeight: 700, color: outputValue ? 'var(--brand)' : 'var(--placeholder)',
+          fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.02em',
+          minHeight: 36, display: 'flex', alignItems: 'center',
+        }}>
+          {loading
+            ? <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: 'var(--subtle)' }} />
+            : outputValue ?? '0.00'
+          }
+        </div>
+      </div>
 
       {/* Error */}
       {error && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, borderRadius: 10, padding: '12px 14px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
-          <AlertCircle size={15} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: 1 }} />
-          <p style={{ fontSize: 13.5, color: 'var(--danger)', margin: 0 }}>{error}</p>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, borderRadius: 10, padding: '10px 14px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', marginBottom: 12 }}>
+          <AlertCircle size={14} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: 1 }} />
+          <p style={{ fontSize: 13, color: 'var(--danger)', margin: 0 }}>{error}</p>
         </div>
       )}
 
-      {/* Result */}
-      {result && !error && (
-        <div style={{ borderRadius: 12, padding: '14px 16px', background: 'rgba(0,214,111,0.05)', border: '1px solid rgba(0,214,111,0.18)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-            <CheckCircle2 size={15} color="var(--brand)" />
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--brand)' }}>Quote ready</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', fontFamily: "'JetBrains Mono', monospace" }}>{result.input}</span>
-            <span style={{ color: 'var(--muted)', fontSize: 13 }}>equals</span>
-            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--brand)', fontFamily: "'Space Grotesk', sans-serif" }}>{result.output}</span>
-          </div>
-          <div style={{ marginTop: 10, display: 'flex', gap: 16, fontSize: 12, color: 'var(--muted)' }}>
-            <span>Round #{result.roundId}</span>
-            <span>Price {formatAge(result.ageSeconds)}</span>
-          </div>
-        </div>
-      )}
+      {/* Convert button */}
+      <button
+        onClick={() => void handleConvert()}
+        disabled={loading || !inputValue}
+        style={{
+          width: '100%', padding: '14px', borderRadius: 12,
+          background: 'var(--brand)', color: '#031a0a',
+          border: 'none', cursor: loading || !inputValue ? 'not-allowed' : 'pointer',
+          fontSize: 15, fontWeight: 700,
+          opacity: loading || !inputValue ? 0.45 : 1,
+          transition: 'opacity 0.15s',
+          fontFamily: "'Space Grotesk', sans-serif",
+        }}
+      >
+        {loading ? 'Converting...' : 'Convert'}
+      </button>
     </div>
   )
 }

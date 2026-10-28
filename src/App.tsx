@@ -9,11 +9,11 @@ export default function App() {
   const [view, setView] = useState<View>('landing')
 
   if (view === 'dashboard') {
-    return <OracleDashboard onBack={() => setView('landing')} />
+    return <OracleDashboard />
   }
 
   if (view === 'docs') {
-    return <DocsPage onBack={() => setView('landing')} />
+    return <DocsPage />
   }
 
   return (

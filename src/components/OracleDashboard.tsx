@@ -3,7 +3,6 @@
  * BEACON dashboard -- light theme, #F5F7FA, proper nav + footer, no framer-motion.
  */
 
-import { ConnectKitButton } from 'connectkit'
 import { ExternalLink } from 'lucide-react'
 import { useOracle } from '@/hooks/useOracle'
 import { RateCard } from './RateCard'
@@ -16,14 +15,9 @@ import { BeaconLogo } from './BeaconLogo'
 import type { RoundPoint } from '@/hooks/useOracle'
 
 const CONTRACT_ADDRESS = import.meta.env.VITE_ORACLE_CONTRACT_ADDRESS as string
-const SHORT_CONTRACT = `${CONTRACT_ADDRESS.slice(0, 8)}...${CONTRACT_ADDRESS.slice(-6)}`
 const EXPLORER = `https://explorer.testnet.arc.io/address/${CONTRACT_ADDRESS}`
 
-interface OracleDashboardProps {
-  onBack?: () => void
-}
-
-export function OracleDashboard({ onBack }: OracleDashboardProps) {
+export function OracleDashboard() {
   const oracle = useOracle()
 
   return (
@@ -40,17 +34,6 @@ export function OracleDashboard({ onBack }: OracleDashboardProps) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <BeaconLogo size={28} />
           <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em', lineHeight: 1 }}>BEACON</span>
-          {onBack && (
-            <button onClick={onBack} style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', padding: '4px 10px', borderRadius: 6 }}>
-              Home
-            </button>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <a href={EXPLORER} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontFamily: "'JetBrains Mono', monospace" }}>
-            {SHORT_CONTRACT} <ExternalLink size={11} />
-          </a>
-          <ConnectKitButton />
         </div>
       </nav>
 

@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, Shield, Zap, Clock, GitBranch, ExternalLink, ChevronRight, BookOpen } from 'lucide-react'
+import { ArrowRight, Shield, Zap, Clock, GitBranch, BookOpen } from 'lucide-react'
 import { BeaconLogo } from './BeaconLogo'
 
 interface LandingPageProps {
@@ -292,7 +292,7 @@ function PriceOrb() {
           LIVE
         </div>
         <div style={{ width: 40, height: 2, background: 'rgba(0,214,111,0.5)', borderRadius: 1, margin: '6px 0' }} />
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.04em' }}>Arc Testnet</div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.04em' }}>Arc Network</div>
       </div>
       {/* Orbiting ring */}
       <div style={{
@@ -337,17 +337,6 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
             <BeaconLogo size={30} />
             <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em', lineHeight: 1 }}>BEACON</span>
           </div>
-          <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button onClick={onOpenDocs} style={navBtn}>
-              <BookOpen size={14} /> Docs
-            </button>
-            <a href={EXPLORER} target="_blank" rel="noreferrer" style={navLink}>
-              Contract <ExternalLink size={11} />
-            </a>
-            <button onClick={onEnterDashboard} style={ctaBtn}>
-              Dashboard <ChevronRight size={14} />
-            </button>
-          </nav>
         </div>
       </header>
 
@@ -503,9 +492,6 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
             <button onClick={onOpenDocs} style={{ ...ctaBtn, padding: '12px 26px', fontSize: 15 }}>
               Read the Docs <BookOpen size={15} />
             </button>
-            <button onClick={onEnterDashboard} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '12px 24px', borderRadius: 10, border: '1.5px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#94a3b8', fontSize: 15, fontWeight: 500, cursor: 'pointer' }}>
-              Open Dashboard <ArrowRight size={15} />
-            </button>
           </div>
         </div>
       </section>
@@ -569,20 +555,6 @@ export function LandingFooter({ onEnterDashboard, onOpenDocs }: { onEnterDashboa
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────
-const navBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 5,
-  fontSize: 13.5, fontWeight: 500, color: '#64748b',
-  background: 'none', border: 'none', cursor: 'pointer',
-  padding: '6px 10px', borderRadius: 7, transition: 'color .15s',
-  fontFamily: "'DM Sans', sans-serif",
-}
-
-const navLink: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4,
-  fontSize: 13.5, fontWeight: 500, color: '#64748b',
-  textDecoration: 'none', padding: '6px 10px', borderRadius: 7,
-}
-
 const ctaBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
   padding: '9px 18px', borderRadius: 10,

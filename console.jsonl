@@ -415,3 +415,69 @@
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793138117344}
 {"level":"debug","message":"[vite] hot updated: /src/components/PriceChart.tsx","timestamp":1793138117459}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793138117459}
+{"level":"debug","message":"[vite] hot updated: /src/components/PriceChart.tsx","timestamp":1793138119273}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793138119274}
+{"level":"debug","message":"[vite] connected.","timestamp":1793138159353}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793138598848}
+{"level":"debug","message":"[vite] connected.","timestamp":1793138700491}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793185438162}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793186825240}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793186825261}
+{"level":"debug","message":"[vite] connected.","timestamp":1793186842834}
+{"level":"debug","message":"[vite] connected.","timestamp":1793187141079}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793187350590}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793187350629}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793222890932}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222890933}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793222893732}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222893733}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793222895325}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222895326}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793222903038}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222903038}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793222903849}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222903850}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793222907172}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222907172}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793222907176}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222907176}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793222915819}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222915819}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793222915825}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222915825}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793222929245}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222929245}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793222929247}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222929247}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793222933414}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222933415}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793222933460}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222933460}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793222945010}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222945011}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793222946748}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222946749}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793222948226}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222948227}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793222948231}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222948232}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793222951498}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222951498}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793222954175}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222954176}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793222954360}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222954360}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793222954951}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222954952}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793222960050}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222960050}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793222960054}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222960054}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793222966070}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222966071}
+{"level":"debug","message":"[vite] hot updated: /src/components/QuoteCalculator.tsx","timestamp":1793222991139}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793222991139}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793223009676}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793223009676}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793223014319}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793223014319}
