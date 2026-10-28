@@ -92,11 +92,11 @@ export function PriceChart({ history, price: _price, loading }: PriceChartProps)
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    const w = canvas.width
-    const h = canvas.height
     const dpr = window.devicePixelRatio || 1
+    const w = canvas.width  / dpr
+    const h = canvas.height / dpr
 
-    ctx.clearRect(0, 0, w, h)
+    ctx.clearRect(0, 0, w * dpr, h * dpr)
 
     if (history.length < 2) return
 
@@ -106,7 +106,7 @@ export function PriceChart({ history, price: _price, loading }: PriceChartProps)
     const { ticks: yTicks, yMin, yMax } = buildYAxis(minP, maxP)
 
     // ── Y-axis grid lines + labels ──────────────────────────────────────
-    ctx.font = `${10 * dpr}px DM Sans, sans-serif`
+    ctx.font = `10px DM Sans, sans-serif`
     ctx.textAlign = 'right'
     for (const tick of yTicks) {
       if (tick === yMin && yMin === 0) continue   // skip zero label when baseline is 0
@@ -222,18 +222,26 @@ export function PriceChart({ history, price: _price, loading }: PriceChartProps)
     return () => cancelAnimationFrame(rafRef.current)
   }, [history, draw])
 
-  // Resize
+  // Resize -- reset transform before scaling to prevent accumulation
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const obs = new ResizeObserver(() => {
+    const setSize = () => {
       const dpr = window.devicePixelRatio || 1
-      canvas.width  = canvas.offsetWidth  * dpr
-      canvas.height = canvas.offsetHeight * dpr
+      const w   = canvas.offsetWidth
+      const h   = canvas.offsetHeight
+      if (w === 0 || h === 0) return
+      canvas.width  = w * dpr
+      canvas.height = h * dpr
       const ctx = canvas.getContext('2d')
-      if (ctx) ctx.scale(dpr, dpr)
+      if (ctx) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0)  // reset before scaling
+        ctx.scale(dpr, dpr)
+      }
       draw(progressRef.current)
-    })
+    }
+    setSize()   // set initial size immediately
+    const obs = new ResizeObserver(setSize)
     obs.observe(canvas)
     return () => obs.disconnect()
   }, [draw])

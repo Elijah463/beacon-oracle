@@ -54,6 +54,23 @@ export function QuoteCalculator() {
   const fromCurrency = direction === 'usdc-to-ngn' ? 'USDC' : 'NGN'
   const toCurrency   = direction === 'usdc-to-ngn' ? 'NGN'  : 'USDC'
 
+  // Format a plain number string with commas for display
+  const formatWithCommas = (raw: string): string => {
+    const clean = raw.replace(/,/g, '')
+    if (!clean) return ''
+    const [intPart, decPart] = clean.split('.')
+    const intFormatted = (intPart ?? '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+    return decPart !== undefined ? `${intFormatted}.${decPart}` : intFormatted
+  }
+
+  const handleInputChange = (raw: string) => {
+    // Allow only digits, one dot, and strip everything else
+    const cleaned = raw.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1')
+    setInputValue(cleaned)
+    setError(null)
+    setOutputValue(null)
+  }
+
   const flip = useCallback(() => {
     setFlipping(true)
     setTimeout(() => setFlipping(false), 300)
@@ -121,9 +138,9 @@ export function QuoteCalculator() {
           </div>
         </div>
         <input
-          type="number" min="0" step="any"
-          value={inputValue}
-          onChange={e => { setInputValue(e.target.value); setError(null); setOutputValue(null) }}
+          type="text" inputMode="decimal"
+          value={formatWithCommas(inputValue)}
+          onChange={e => handleInputChange(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') void handleConvert() }}
           placeholder="0.00"
           style={{

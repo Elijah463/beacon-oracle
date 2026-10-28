@@ -3,6 +3,7 @@
  * BEACON dashboard -- light theme, #F5F7FA, proper nav + footer, no framer-motion.
  */
 
+import { useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 import { useOracle } from '@/hooks/useOracle'
 import { RateCard } from './RateCard'
@@ -115,14 +116,58 @@ export function OracleDashboard() {
   )
 }
 
+const PAGE_SIZE = 20
+
 function RoundHistoryTable({ history, loading }: { history: RoundPoint[]; loading: boolean }) {
+  const [page, setPage] = useState(0)  // 0 = latest page
   const reversed = [...history].reverse()
+  const totalPages = Math.ceil(reversed.length / PAGE_SIZE)
+  // page 0 = newest 20, page 1 = next 20 older, etc.
+  const pageRows = reversed.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
+  const isLatest = page === 0
 
   return (
     <div style={{ borderRadius: 18, overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-      <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
-        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--subtle)', margin: 0 }}>Round History</p>
-        <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', margin: '3px 0 0' }}>Last {history.length} on-chain rounds</p>
+      {/* Header */}
+      <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <div>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--subtle)', margin: 0 }}>Round History</p>
+          <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', margin: '3px 0 0' }}>
+            {reversed.length > 0 ? `${reversed.length} on-chain rounds` : 'No rounds yet'}
+          </p>
+        </div>
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {!isLatest && (
+              <button
+                onClick={() => setPage(0)}
+                style={{ fontSize: 12, fontWeight: 600, color: 'var(--brand)', background: 'rgba(0,214,111,0.08)', border: '1px solid var(--brand-border)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer' }}
+              >
+                Go to Latest
+              </button>
+            )}
+            <button
+              onClick={() => setPage(p => Math.min(p + 1, totalPages - 1))}
+              disabled={page >= totalPages - 1}
+              title="Older rounds"
+              style={{ fontSize: 13, fontWeight: 700, color: page >= totalPages - 1 ? 'var(--subtle)' : 'var(--ink)', background: 'var(--bg-muted)', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 10px', cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.4 : 1 }}
+            >
+              {'<<<<'}
+            </button>
+            <span style={{ fontSize: 11, color: 'var(--subtle)', minWidth: 48, textAlign: 'center' }}>
+              {page + 1} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.max(p - 1, 0))}
+              disabled={isLatest}
+              title="Newer rounds"
+              style={{ fontSize: 13, fontWeight: 700, color: isLatest ? 'var(--subtle)' : 'var(--ink)', background: 'var(--bg-muted)', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 10px', cursor: isLatest ? 'default' : 'pointer', opacity: isLatest ? 0.4 : 1 }}
+            >
+              {'>>>>'}
+            </button>
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -148,10 +193,11 @@ function RoundHistoryTable({ history, loading }: { history: RoundPoint[]; loadin
               </tr>
             </thead>
             <tbody>
-              {reversed.map((row, idx) => {
-                const nextRow = reversed[idx + 1]
+              {pageRows.map((row, idx) => {
+                // change relative to next older round on this page
+                const nextRow = pageRows[idx + 1]
                 const change = nextRow ? ((row.price - nextRow.price) / nextRow.price) * 100 : null
-                const isUp = change !== null && change > 0
+                const isUp   = change !== null && change > 0
                 const isDown = change !== null && change < 0
                 return (
                   <tr key={row.roundId} style={{ borderBottom: '1px solid var(--border)' }}>
