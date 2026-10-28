@@ -450,7 +450,7 @@ contract NairaPayment {
     IBeacon constant BEACON =
         IBeacon(${CONTRACT});
     IERC20  constant USDC   =
-        IERC20(0x036CbD53842c5426634e7929541eC2318f3dCF7e); // Base Sepolia USDC
+        IERC20(0x036CbD53842c5426634e7929541eC2318f3dCF7e); // Replace with USDC address on your target chain
 
     event Paid(address indexed payer, uint256 usdc, uint256 ngn);
 
@@ -752,9 +752,38 @@ event NewTransmission(
   },
 ]
 
+// ── Sidebar nav list ───────────────────────────────────────────────────────
+function SidebarContents({ activeIdx, onSelect }: { activeIdx: number; onSelect: (i: number) => void }) {
+  return (
+    <>
+      <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: '#475569', textTransform: 'uppercase', padding: '0 20px 12px', margin: 0 }}>
+        Contents
+      </p>
+      {SECTIONS.map((s, i) => (
+        <button
+          key={s.id}
+          onClick={() => onSelect(i)}
+          style={{
+            display: 'block', width: '100%', textAlign: 'left',
+            padding: '10px 20px', background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: 14, fontWeight: activeIdx === i ? 600 : 400,
+            color: activeIdx === i ? '#00D66F' : '#64748b',
+            borderLeft: activeIdx === i ? '2px solid #00D66F' : '2px solid transparent',
+            borderRight: 'none',
+            transition: 'color .15s',
+          }}
+        >
+          {i + 1}. {s.title}
+        </button>
+      ))}
+    </>
+  )
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 export function DocsPage() {
-  const [activeIdx, setActiveIdx] = useState(0)
+  const [activeIdx, setActiveIdx]   = useState(0)
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
 
   const section = SECTIONS[activeIdx]
@@ -763,7 +792,23 @@ export function DocsPage() {
 
   useEffect(() => {
     contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [activeIdx])
+
+  useEffect(() => {
+    if (!drawerOpen) return
+    const close = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-drawer]')) setDrawerOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [drawerOpen])
+
+  const selectSection = (i: number) => {
+    setActiveIdx(i)
+    setDrawerOpen(false)
+  }
 
   return (
     <div style={{ background: '#080c14', minHeight: '100dvh', display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif" }}>
@@ -771,68 +816,99 @@ export function DocsPage() {
       {/* Nav */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 40,
-        background: 'rgba(8,12,20,0.92)', backdropFilter: 'blur(12px)',
+        background: 'rgba(8,12,20,0.95)', backdropFilter: 'blur(12px)',
         borderBottom: '1px solid rgba(255,255,255,0.07)',
-        padding: '0 24px', height: 60,
+        padding: '0 20px', height: 60,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <BeaconLogo size={28} />
           <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em', lineHeight: 1 }}>BEACON</span>
+          <span style={{ color: '#334155', fontSize: 14, marginLeft: 2 }}>/</span>
+          <span style={{ color: '#64748b', fontSize: 14 }}>Docs</span>
         </div>
+
+        {/* Hamburger -- mobile only */}
+        <button
+          data-drawer
+          onClick={() => setDrawerOpen(o => !o)}
+          aria-label="Toggle menu"
+          style={{
+            display: 'none',
+            background: 'none', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 8, padding: '7px 10px', cursor: 'pointer', color: '#94a3b8',
+          }}
+          className="docs-hamburger"
+        >
+          {drawerOpen ? (
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 2l14 14M16 2L2 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+          )}
+        </button>
       </header>
 
+      {/* Mobile drawer overlay */}
+      {drawerOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 35,
+          background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)',
+        }} />
+      )}
+
+      {/* Mobile drawer panel */}
+      <div
+        data-drawer
+        style={{
+          position: 'fixed', top: 60, left: 0, bottom: 0, zIndex: 36,
+          width: 260, background: '#0d1321',
+          borderRight: '1px solid rgba(255,255,255,0.08)',
+          overflowY: 'auto', paddingTop: 24,
+          transform: drawerOpen ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform .22s ease',
+          display: 'none',
+        }}
+        className="docs-drawer"
+      >
+        <SidebarContents activeIdx={activeIdx} onSelect={selectSection} />
+      </div>
+
+      {/* Body */}
       <div style={{ display: 'flex', flex: 1, maxWidth: 1200, margin: '0 auto', width: '100%' }}>
 
-        {/* Sidebar */}
-        <aside style={{
-          width: 220, flexShrink: 0,
-          borderRight: '1px solid rgba(255,255,255,0.06)',
-          padding: '32px 0', position: 'sticky', top: 60,
-          height: 'calc(100dvh - 60px)', overflowY: 'auto',
-        }}>
-          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: '#475569', textTransform: 'uppercase', padding: '0 20px 12px', margin: 0 }}>
-            Contents
-          </p>
-          {SECTIONS.map((s, i) => (
-            <button
-              key={s.id}
-              onClick={() => setActiveIdx(i)}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left',
-                padding: '9px 20px', background: 'none', border: 'none', cursor: 'pointer',
-                fontSize: 13.5, fontWeight: activeIdx === i ? 600 : 400,
-                color: activeIdx === i ? '#00D66F' : '#64748b',
-                borderRight: activeIdx === i ? '2px solid #00D66F' : '2px solid transparent',
-                transition: 'color .15s',
-              }}
-            >
-              {i + 1}. {s.title}
-            </button>
-          ))}
+        {/* Desktop sidebar */}
+        <aside
+          className="docs-sidebar"
+          style={{
+            width: 224, flexShrink: 0,
+            borderRight: '1px solid rgba(255,255,255,0.06)',
+            padding: '32px 0', position: 'sticky', top: 60,
+            height: 'calc(100dvh - 60px)', overflowY: 'auto',
+          }}>
+          <SidebarContents activeIdx={activeIdx} onSelect={selectSection} />
         </aside>
 
         {/* Content */}
         <main
           ref={contentRef}
-          style={{ flex: 1, padding: '40px 48px 80px', overflowY: 'auto', minWidth: 0 }}
+          style={{ flex: 1, padding: '40px 32px 80px', overflowY: 'auto', minWidth: 0, maxWidth: '100%' }}
         >
           {section.content()}
 
-          {/* Bottom nav */}
+          {/* Bottom prev/next */}
           <div style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             marginTop: 64, paddingTop: 32, borderTop: '1px solid rgba(255,255,255,0.07)',
+            gap: 12, flexWrap: 'wrap',
           }}>
             {prev ? (
               <button
-                onClick={() => setActiveIdx(activeIdx - 1)}
+                onClick={() => selectSection(activeIdx - 1)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   background: 'none', border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: 10, padding: '10px 18px', cursor: 'pointer',
                   color: '#94a3b8', fontSize: 13.5, fontWeight: 500,
-                  transition: 'border-color .15s',
                 }}
               >
                 <ChevronLeft size={16} />
@@ -845,13 +921,12 @@ export function DocsPage() {
 
             {next ? (
               <button
-                onClick={() => setActiveIdx(activeIdx + 1)}
+                onClick={() => selectSection(activeIdx + 1)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   background: 'rgba(0,214,111,0.1)', border: '1px solid rgba(0,214,111,0.25)',
                   borderRadius: 10, padding: '10px 18px', cursor: 'pointer',
                   color: '#00D66F', fontSize: 13.5, fontWeight: 600,
-                  transition: 'border-color .15s',
                 }}
               >
                 <div style={{ textAlign: 'right' }}>
@@ -864,6 +939,19 @@ export function DocsPage() {
           </div>
         </main>
       </div>
+
+      {/* Responsive CSS */}
+      <style>{`
+        @media (max-width: 768px) {
+          .docs-sidebar   { display: none !important; }
+          .docs-hamburger { display: flex !important; }
+          .docs-drawer    { display: block !important; }
+        }
+        @media (min-width: 769px) {
+          .docs-drawer    { display: none !important; }
+          .docs-hamburger { display: none !important; }
+        }
+      `}</style>
     </div>
   )
 }

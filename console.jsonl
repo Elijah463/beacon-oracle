@@ -533,3 +533,45 @@
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793225505214}
 {"level":"debug","message":"[vite] hot updated: /src/components/QuoteCalculator.tsx","timestamp":1793225505707}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793225505707}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793226080333}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793226080502}
+{"level":"debug","message":"[vite] connected.","timestamp":1793226093567}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793226375252}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793226375253}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793226375278}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793226375278}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793226378865}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793226378866}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793226379240}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793226379241}
+{"level":"debug","message":"[vite] connected.","timestamp":1793226385538}
+{"level":"debug","message":"[vite] invalidate /src/components/DocsPage.tsx: Could not Fast Refresh (export removed)","timestamp":1793226400571}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793226400572}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793226400572}
+{"level":"debug","message":"[vite] invalidate /src/components/DocsPage.tsx: Could not Fast Refresh (export removed)","timestamp":1793226400574}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793226400574}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793226400574}
+{"level":"error","message":"[vite] SyntaxError: The requested module '/src/components/DocsPage.tsx?t=1793226396856' does not provide an export named 'DocsPage'","timestamp":1793226406961,"stack":"SyntaxError: The requested module '/src/components/DocsPage.tsx?t=1793226396856' does not provide an export named 'DocsPage'"}
+{"level":"error","message":"[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)","timestamp":1793226406961}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793226406962}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793226406962}
+{"level":"error","message":"[vite] SyntaxError: The requested module '/src/components/DocsPage.tsx?t=1793226396856' does not provide an export named 'DocsPage'","timestamp":1793226407250,"stack":"SyntaxError: The requested module '/src/components/DocsPage.tsx?t=1793226396856' does not provide an export named 'DocsPage'"}
+{"level":"error","message":"[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)","timestamp":1793226407250}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793226407251}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793226407251}
+{"level":"debug","message":"[vite] invalidate /src/components/DocsPage.tsx: Could not Fast Refresh (new export)","timestamp":1793226412076}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793226412076}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793226412077}
+{"level":"debug","message":"[vite] invalidate /src/components/DocsPage.tsx: Could not Fast Refresh (new export)","timestamp":1793226413357}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793226413358}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793226413358}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793226414281}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793226414281}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793226415206}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793226415206}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793226415692}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793226415692}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793226415948}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793226415948}
+{"level":"debug","message":"(previous line repeated 1× more)","timestamp":1793226417489}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793226417489}

@@ -119,12 +119,25 @@ export function OracleDashboard() {
 const PAGE_SIZE = 20
 
 function RoundHistoryTable({ history, loading }: { history: RoundPoint[]; loading: boolean }) {
-  const [page, setPage] = useState(0)  // 0 = latest page
-  const reversed = [...history].reverse()
-  const totalPages = Math.ceil(reversed.length / PAGE_SIZE)
-  // page 0 = newest 20, page 1 = next 20 older, etc.
-  const pageRows = reversed.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
-  const isLatest = page === 0
+  // mode: 'latest' shows newest PAGE_SIZE rounds; 'history' shows paginated older rounds
+  const [mode, setMode] = useState<'latest' | 'history'>('latest')
+  const [histPage, setHistPage] = useState(1) // 1-indexed; page 0 is always 'latest'
+
+  const reversed     = [...history].reverse()   // newest first
+  const totalPages   = Math.ceil(reversed.length / PAGE_SIZE)
+  const hasMore      = reversed.length > PAGE_SIZE
+
+  // Which rows to show
+  const pageRows = mode === 'latest'
+    ? reversed.slice(0, PAGE_SIZE)
+    : reversed.slice(histPage * PAGE_SIZE, (histPage + 1) * PAGE_SIZE)
+
+  const btnBase: React.CSSProperties = {
+    fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '5px 10px',
+    border: '1px solid var(--border)', background: 'var(--bg-muted)',
+    color: 'var(--ink)', cursor: 'pointer',
+  }
+  const btnDisabled: React.CSSProperties = { ...btnBase, opacity: 0.3, cursor: 'default' }
 
   return (
     <div style={{ borderRadius: 18, overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
@@ -133,41 +146,50 @@ function RoundHistoryTable({ history, loading }: { history: RoundPoint[]; loadin
         <div>
           <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--subtle)', margin: 0 }}>Round History</p>
           <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', margin: '3px 0 0' }}>
-            {reversed.length > 0 ? `${reversed.length} on-chain rounds` : 'No rounds yet'}
+            {reversed.length > 0 ? `${reversed.length} on-chain round${reversed.length !== 1 ? 's' : ''}` : 'No rounds yet'}
           </p>
         </div>
-        {/* Pagination controls */}
-        {totalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {!isLatest && (
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          {/* Mode toggle */}
+          {mode === 'latest' && hasMore && (
+            <button
+              onClick={() => { setMode('history'); setHistPage(1) }}
+              style={{ ...btnBase, color: 'var(--subtle)' }}
+            >
+              Previous rounds
+            </button>
+          )}
+          {mode === 'history' && (
+            <>
               <button
-                onClick={() => setPage(0)}
-                style={{ fontSize: 12, fontWeight: 600, color: 'var(--brand)', background: 'rgba(0,214,111,0.08)', border: '1px solid var(--brand-border)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer' }}
+                onClick={() => { setMode('latest'); setHistPage(1) }}
+                style={{ ...btnBase, color: 'var(--brand)', border: '1px solid var(--brand-border)', background: 'rgba(0,214,111,0.08)' }}
               >
                 Go to Latest
               </button>
-            )}
-            <button
-              onClick={() => setPage(p => Math.min(p + 1, totalPages - 1))}
-              disabled={page >= totalPages - 1}
-              title="Older rounds"
-              style={{ fontSize: 13, fontWeight: 700, color: page >= totalPages - 1 ? 'var(--subtle)' : 'var(--ink)', background: 'var(--bg-muted)', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 10px', cursor: page >= totalPages - 1 ? 'default' : 'pointer', opacity: page >= totalPages - 1 ? 0.4 : 1 }}
-            >
-              {'<<<<'}
-            </button>
-            <span style={{ fontSize: 11, color: 'var(--subtle)', minWidth: 48, textAlign: 'center' }}>
-              {page + 1} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage(p => Math.max(p - 1, 0))}
-              disabled={isLatest}
-              title="Newer rounds"
-              style={{ fontSize: 13, fontWeight: 700, color: isLatest ? 'var(--subtle)' : 'var(--ink)', background: 'var(--bg-muted)', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 10px', cursor: isLatest ? 'default' : 'pointer', opacity: isLatest ? 0.4 : 1 }}
-            >
-              {'>>>>'}
-            </button>
-          </div>
-        )}
+              <button
+                onClick={() => setHistPage(p => Math.min(p + 1, totalPages - 1))}
+                disabled={histPage >= totalPages - 1}
+                style={histPage >= totalPages - 1 ? btnDisabled : btnBase}
+                title="Older"
+              >
+                {'<<<<'}
+              </button>
+              <span style={{ fontSize: 11, color: 'var(--subtle)', minWidth: 52, textAlign: 'center' }}>
+                {histPage + 1} / {totalPages}
+              </span>
+              <button
+                onClick={() => setHistPage(p => Math.max(p - 1, 1))}
+                disabled={histPage <= 1}
+                style={histPage <= 1 ? btnDisabled : btnBase}
+                title="Newer"
+              >
+                {'>>>>'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -178,7 +200,7 @@ function RoundHistoryTable({ history, loading }: { history: RoundPoint[]; loadin
         </div>
       ) : reversed.length === 0 ? (
         <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <p style={{ fontSize: 13.5, color: 'var(--subtle)' }}>No rounds yet. Start the reporter to populate data.</p>
+          <p style={{ fontSize: 13.5, color: 'var(--subtle)' }}>No rounds yet. The reporter publishes on first cycle.</p>
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -194,11 +216,10 @@ function RoundHistoryTable({ history, loading }: { history: RoundPoint[]; loadin
             </thead>
             <tbody>
               {pageRows.map((row, idx) => {
-                // change relative to next older round on this page
                 const nextRow = pageRows[idx + 1]
-                const change = nextRow ? ((row.price - nextRow.price) / nextRow.price) * 100 : null
-                const isUp   = change !== null && change > 0
-                const isDown = change !== null && change < 0
+                const change  = nextRow ? ((row.price - nextRow.price) / nextRow.price) * 100 : null
+                const isUp    = change !== null && change > 0
+                const isDown  = change !== null && change < 0
                 return (
                   <tr key={row.roundId} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '11px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: 'var(--subtle)' }}>#{row.roundId}</td>
