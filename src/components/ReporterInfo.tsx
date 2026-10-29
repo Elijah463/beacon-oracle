@@ -9,7 +9,7 @@ function shortAddr(addr: string): string {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`
 }
 
-const EXPLORER = 'https://explorer.testnet.arc.io'
+const EXPLORER = 'https://explorer.arc.io'
 
 export function ReporterInfo({ reporter, contractAddress }: ReporterInfoProps) {
   const rows = [
@@ -36,7 +36,7 @@ export function ReporterInfo({ reporter, contractAddress }: ReporterInfoProps) {
         </div>
         <div>
           <p className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'var(--subtle)', letterSpacing: '0.08em' }}>Network</p>
-          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Arc Testnet</p>
+          <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Arc Network</p>
         </div>
       </div>
 

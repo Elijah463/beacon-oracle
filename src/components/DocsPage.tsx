@@ -11,8 +11,8 @@ import { ChevronLeft, ChevronRight, Copy, Check, ExternalLink } from 'lucide-rea
 import { BeaconMark } from './BeaconLogo'
 
 const CONTRACT = '0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797'
-const EXPLORER = `https://explorer.testnet.arc.io/address/${CONTRACT}`
-const CHAIN_ID  = 5042002
+const EXPLORER = `https://explorer.arc.io/address/${CONTRACT}`
+const CHAIN_ID  = 5042
 
 // ── Copy button ────────────────────────────────────────────────────────────
 function CopyButton({ text }: { text: string }) {
@@ -159,15 +159,15 @@ const SECTIONS = [
           existing Chainlink consumer contract works with BEACON without modification.
         </P>
 
-        <H3>Contract address (Arc Testnet)</H3>
+        <H3>Contract address (Arc Network)</H3>
         <Code lang="text">{`${CONTRACT}
 
 Chain ID: ${CHAIN_ID}
-Network:  Arc Testnet
-RPC:      https://rpc.testnet.arc.io`}</Code>
+Network:  Arc Network
+RPC:      https://rpc.mainnet.arc.io`}</Code>
 
         <Note type="info">
-          BEACON is currently deployed on Arc Testnet. The proxy address above is permanent
+          BEACON is deployed on Arc Network. The proxy address above is permanent
           even after future upgrades. Always use the proxy address, never an implementation address.
         </Note>
 
@@ -257,14 +257,14 @@ contract MyContract {
         <Code lang="typescript">{`import { createPublicClient, http } from "viem";
 import { defineChain } from "viem";
 
-const arcTestnet = defineChain({
+const arc = defineChain({
   id: ${CHAIN_ID},
-  name: "Arc Testnet",
+  name: "Arc",
   nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
-  rpcUrls: { default: { http: ["https://rpc.testnet.arc.io"] } },
+  rpcUrls: { default: { http: ["https://rpc.mainnet.arc.io"] } },
 });
 
-const client = createPublicClient({ chain: arcTestnet, transport: http() });
+const client = createPublicClient({ chain: arc, transport: http() });
 
 const BEACON_ADDRESS = "${CONTRACT}";
 const ABI = [

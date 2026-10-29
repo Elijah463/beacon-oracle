@@ -700,3 +700,12 @@
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793277950099}
 {"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793277950100}
 {"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793277970143}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793309230694}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793309268900}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793309268901}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793309289340}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793309289341}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793309297965}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793309297965}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793309309212}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793309309213}

@@ -6,7 +6,7 @@
 
 import { useState, useCallback } from 'react'
 import { usePublicClient } from 'wagmi'
-import { arcTestnet } from 'viem/chains'
+import { arc } from 'viem/chains'
 import { ArrowUpDown, Loader2, AlertCircle } from 'lucide-react'
 import { ORACLE_ABI } from '@/lib/oracleAbi'
 import { formatCompact } from '@/lib/formatNumber'
@@ -50,7 +50,7 @@ export function QuoteCalculator() {
   const [error, setError]           = useState<string | null>(null)
   const [flipping, setFlipping]     = useState(false)
 
-  const publicClient = usePublicClient({ chainId: arcTestnet.id })
+  const publicClient = usePublicClient({ chainId: arc.id })
 
   const fromCurrency = direction === 'usdc-to-ngn' ? 'USDC' : 'NGN'
   const toCurrency   = direction === 'usdc-to-ngn' ? 'NGN'  : 'USDC'

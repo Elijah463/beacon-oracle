@@ -34,14 +34,14 @@
  *   CIRCLE_API_KEY                -- Circle Standard Developer API key
  *   CIRCLE_ENTITY_SECRET          -- Registered 32-byte entity secret
  *   REPORTER_WALLET_ID            -- Wallet ID from scripts/setup-reporter-wallet.ts
- *   VITE_ORACLE_CONTRACT_ADDRESS  -- Deployed BEACON proxy address on Arc Testnet
+ *   VITE_ORACLE_CONTRACT_ADDRESS  -- Deployed BEACON proxy address on Arc Network
  *   REPORTER_SIGNING_KEY          -- Hex private key for ECDSA payload signing
  */
 
 import { initiateDeveloperControlledWalletsClient } from '@circle-fin/developer-controlled-wallets'
 import { createPublicClient, http, encodePacked, keccak256 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import { arcTestnet } from 'viem/chains'
+import { arc } from 'viem/chains'
 
 import {
   fetchUsdcUsdCoinbase,
@@ -171,12 +171,12 @@ const circleClient = initiateDeveloperControlledWalletsClient({
 
 const rpcUrl: string =
   process.env.RPC_PROXY_BASE_URL &&
-  (process.env.RPC_PROXY_CHAINS ?? '').split(',').includes('Arc_Testnet')
-    ? `${process.env.RPC_PROXY_BASE_URL}/api/rpc/Arc_Testnet?_rpc_token=${process.env.RPC_PROXY_TOKEN}`
-    : 'https://rpc.testnet.arc.io'
+  (process.env.RPC_PROXY_CHAINS ?? '').split(',').includes('Arc')
+    ? `${process.env.RPC_PROXY_BASE_URL}/api/rpc/Arc?_rpc_token=${process.env.RPC_PROXY_TOKEN}`
+    : 'https://rpc.mainnet.arc.io'
 
 const publicClient = createPublicClient({
-  chain: arcTestnet,
+  chain: arc,
   transport: http(rpcUrl),
 })
 

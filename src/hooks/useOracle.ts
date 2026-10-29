@@ -2,7 +2,7 @@
  * useOracle.ts
  * Reads the deployed USDCNGNOracle proxy every 15 seconds using direct
  * publicClient.readContract calls -- no multicall, no wagmi useReadContracts.
- * Arc Testnet's Multicall3 deployment reverts, so every batched call must be
+ * Arc mainnet -- all reads use direct publicClient.readContract calls.
  * replaced with individual eth_call requests.
  *
  * PhaseId encoding: latestRound() returns (phaseId << 64) | aggregatorCounter.
@@ -12,7 +12,7 @@
 
 import { usePublicClient } from 'wagmi'
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { arcTestnet } from 'viem/chains'
+import { arc } from 'viem/chains'
 import { ORACLE_ABI } from '@/lib/oracleAbi'
 
 const CONTRACT_ADDRESS   = import.meta.env.VITE_ORACLE_CONTRACT_ADDRESS as `0x${string}`
@@ -78,7 +78,7 @@ function read<T>(client: AnyClient, functionName: string, args?: unknown[]): Pro
 export function useOracle(): OracleState {
   const [state, setState]     = useState<OracleState>(EMPTY)
   const [now, setNow]         = useState(() => Math.floor(Date.now() / 1000))
-  const publicClient          = usePublicClient({ chainId: arcTestnet.id })
+  const publicClient          = usePublicClient({ chainId: arc.id })
   const lastHistoryRound      = useRef<bigint | null>(null)
   const isFetchingRef         = useRef(false)
 

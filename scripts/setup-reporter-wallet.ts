@@ -5,11 +5,11 @@
  *
  * What it does:
  *   1. Creates a wallet set named "BEACON Reporter"
- *   2. Creates one EOA wallet on ARC-TESTNET inside that set
+ *   2. Creates one EOA wallet on ARC-MAINNET inside that set
  *   3. Prints the wallet address and wallet ID to stdout
  *   4. You then:
  *      a. Copy REPORTER_WALLET_ID into your .env
- *      b. Fund the wallet address with Arc Testnet USDC (gas on Arc IS USDC)
+ *      b. Fund the wallet address with Arc Network USDC (gas on Arc IS USDC)
  *         via the "Get test USDC" button in the Arc Studio sidebar
  *      c. Call setReporter(<wallet-address>) on the oracle contract as the owner
  *
@@ -72,14 +72,14 @@ async function main() {
   }
   console.log(`[setup] Wallet set created: ${walletSetId}`)
 
-  // Step 2: Create one EOA wallet on ARC-TESTNET
-  // EOA is the right choice here: no creation fees, highest TPS, and Arc Testnet
+  // Step 2: Create one EOA wallet on ARC-MAINNET
+  // EOA is the right choice here: no creation fees, highest TPS, and Arc Network
   // uses USDC as native gas -- no separate gas token needed.
-  console.log('[setup] Creating EOA wallet on ARC-TESTNET...')
+  console.log('[setup] Creating EOA wallet on ARC...')
 
   const walletRes = await client.createWallets({
     accountType: 'EOA',
-    blockchains: ['ARC-TESTNET'],
+    blockchains: ['ARC'],
     count: 1,
     walletSetId,
     idempotencyKey: randomUUID(),
@@ -102,14 +102,14 @@ async function main() {
   console.log('\n=== BEACON Reporter Wallet Created ===')
   console.log(`Wallet ID:      ${walletId}`)
   console.log(`Wallet Address: ${walletAddress}`)
-  console.log(`Network:        ARC-TESTNET`)
+  console.log(`Network:        ARC`)
   console.log('')
   console.log('Next steps:')
   console.log(`  1. Add to .env:`)
   console.log(`       REPORTER_WALLET_ID=${walletId}`)
   console.log(`       REPORTER_WALLET_ADDRESS=${walletAddress}`)
   console.log('')
-  console.log(`  2. Fund the wallet with Arc Testnet USDC (USDC is gas on Arc):`)
+  console.log(`  2. Fund the wallet with Arc Network USDC (USDC is gas on Arc):`)
   console.log(`       - Use the "Get test USDC" button in the Arc Studio sidebar`)
   console.log(`       - Or drip from https://faucet.circle.com`)
   console.log(`       - Send to: ${walletAddress}`)
@@ -117,7 +117,7 @@ async function main() {
   console.log(`  3. Set this wallet as the oracle reporter (run as owner):`)
   console.log(`       cast send ${process.env.VITE_ORACLE_CONTRACT_ADDRESS ?? '<CONTRACT>'} \\`)
   console.log(`         "setReporter(address)" ${walletAddress} \\`)
-  console.log(`         --rpc-url https://rpc.testnet.arc.io \\`)
+  console.log(`         --rpc-url https://rpc.mainnet.arc.io \\`)
   console.log(`         --private-key <OWNER_PRIVATE_KEY>`)
   console.log('')
   console.log(`  4. Start the reporter loop:`)

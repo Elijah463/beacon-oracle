@@ -17,7 +17,7 @@ interface LandingPageProps {
 }
 
 const CONTRACT    = '0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797'
-const EXPLORER    = `https://explorer.testnet.arc.io/address/${CONTRACT}`
+const EXPLORER    = `https://explorer.arc.io/address/${CONTRACT}`
 const SHORT_CONTRACT = `${CONTRACT.slice(0, 8)}...${CONTRACT.slice(-6)}`
 
 // ── Orderbook background canvas ────────────────────────────────────────────
@@ -527,7 +527,7 @@ export function LandingFooter({ onEnterDashboard, onOpenDocs }: { onEnterDashboa
           <div>
             <p style={footerHead}>Network</p>
             <ul style={footerList}>
-              <li><a href="https://explorer.testnet.arc.io" target="_blank" rel="noreferrer" style={footerLink}>Arc Testnet Explorer</a></li>
+              <li><a href="https://explorer.arc.io" target="_blank" rel="noreferrer" style={footerLink}>Arc Explorer</a></li>
               <li><a href={EXPLORER} target="_blank" rel="noreferrer" style={footerLink}>{SHORT_CONTRACT}</a></li>
             </ul>
           </div>
@@ -540,7 +540,7 @@ export function LandingFooter({ onEnterDashboard, onOpenDocs }: { onEnterDashboa
             </a>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00D66F', display: 'inline-block' }} />
-              <span style={{ fontSize: 12, color: '#475569' }}>Arc Testnet</span>
+              <span style={{ fontSize: 12, color: '#475569' }}>Arc Network</span>
             </div>
           </div>
         </div>

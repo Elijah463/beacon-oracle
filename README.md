@@ -1,6 +1,6 @@
 # BEACON Oracle
 
-**BEACON** is a production-grade, upgradeable USDC/NGN price oracle built on Arc Testnet.
+**BEACON** is a production-grade, upgradeable USDC/NGN price oracle built on Arc Network.
 
 It derives the real-time value of 1 USDC in Nigerian Naira by independently aggregating spot prices from multiple off-chain sources and publishing them on-chain through a Chainlink-compatible smart contract. External contracts can query live prices or request computed conversion quotes directly from the oracle.
 
@@ -22,7 +22,7 @@ Off-chain Reporter (Bun on Fly.io)
       |-- Heartbeat: force-publish every 1h even if no deviation
       |
       v
-USDCNGNOracle.sol (Arc Testnet)
+USDCNGNOracle.sol (Arc Network)
       |
       |-- Stores up to 100 rounds in a circular buffer
       |-- Chainlink AggregatorV3Interface compatible
@@ -57,9 +57,9 @@ Example: 1 USDC = 1,620.50 NGN stored as `162050000000`.
 
 ## Smart Contract
 
-**Network:** Arc Testnet
+**Network:** Arc Network
 **Address:** `0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797` (ERC1967 proxy)
-**Explorer:** https://explorer.testnet.arc.io/address/0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797
+**Explorer:** https://explorer.arc.io/address/0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797
 
 ### Key functions
 
@@ -191,7 +191,7 @@ The reporter is a long-running process and cannot run on Vercel. Deploy it as a 
 
 ## Contract Integration
 
-To consume the oracle from another contract on Arc Testnet:
+To consume the oracle from another contract on Arc Network:
 
 ```solidity
 interface IBeaconOracle {

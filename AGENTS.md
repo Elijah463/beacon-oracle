@@ -1,6 +1,6 @@
 # BEACON Oracle -- Agent Notes
 
-## Deployed Contracts (Arc Testnet)
+## Deployed Contracts (Arc Network)
 
 ### LIVE CONTRACT (owner-controlled, use this one)
 | Field | Value |
@@ -10,8 +10,8 @@
 | Owner wallet | `0xBA29b16Adbf5F1D7dD2CeD98fE57189388c65B76` |
 | Reporter signing address | `0xdCF40c61Cc7A1D9A9C7F90f0be80A05797757d7b` |
 | Deployed via | `forge script contracts/script/DeployBeacon.s.sol` |
-| Explorer | https://explorer.testnet.arc.io/address/0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 |
-| Network | Arc Testnet (chainId 5042002) |
+| Explorer | https://explorer.arc.io/address/0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 |
+| Network | Arc Network (chainId 5042) |
 | Contract version | v6 (UUPS upgradeable, phaseId encoding, ECDSA signature verification, typeAndVersion) |
 
 ### Previous deployments (Circle SCP deployer -- owner is Circle wallet, not usable for governance)
@@ -44,20 +44,20 @@
 ## Key Commands
 ```bash
 # Check current reporter
-cast call 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "reporter()(address)" --rpc-url https://rpc.testnet.arc.io
+cast call 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "reporter()(address)" --rpc-url https://rpc.mainnet.arc.io
 
 # Check circuit breaker
-cast call 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "circuitBreakerTripped()(bool)" --rpc-url https://rpc.testnet.arc.io
+cast call 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "circuitBreakerTripped()(bool)" --rpc-url https://rpc.mainnet.arc.io
 
 # Check latest round
-cast call 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "latestRound()(uint256)" --rpc-url https://rpc.testnet.arc.io
+cast call 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "latestRound()(uint256)" --rpc-url https://rpc.mainnet.arc.io
 
 # Reset circuit breaker (owner only)
-cast send 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "resetCircuitBreaker()" --private-key $OWNER_PRIVATE_KEY --rpc-url https://rpc.testnet.arc.io
+cast send 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "resetCircuitBreaker()" --private-key $OWNER_PRIVATE_KEY --rpc-url https://rpc.mainnet.arc.io
 
 # Set reporter signing address (owner only)
-cast send 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "setReporter(address)" <NEW_ADDRESS> --private-key $OWNER_PRIVATE_KEY --rpc-url https://rpc.testnet.arc.io
+cast send 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "setReporter(address)" <NEW_ADDRESS> --private-key $OWNER_PRIVATE_KEY --rpc-url https://rpc.mainnet.arc.io
 
 # Upgrade implementation (owner only)
-cast send 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "upgradeToAndCall(address,bytes)" <NEW_IMPL> 0x --private-key $OWNER_PRIVATE_KEY --rpc-url https://rpc.testnet.arc.io
+cast send 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "upgradeToAndCall(address,bytes)" <NEW_IMPL> 0x --private-key $OWNER_PRIVATE_KEY --rpc-url https://rpc.mainnet.arc.io
 ```
