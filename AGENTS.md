@@ -29,7 +29,7 @@
 |---|---|---|
 | Owner (governance) | `0xBA29b16Adbf5F1D7dD2CeD98fE57189388c65B76` | Yes -- OWNER_PRIVATE_KEY in .env |
 | Reporter signing key | `0xdCF40c61Cc7A1D9A9C7F90f0be80A05797757d7b` | Yes -- REPORTER_SIGNING_KEY in .env |
-| Circle reporter wallet | Set after setup-reporter-wallet.ts | Yes -- managed by Circle SDK |
+| Circle reporter wallet (mainnet) | `0x87ff466c060f9d29e25aae3b43c3096a671c3928` | Yes -- Circle SDK wallet ID `226207fc-17fe-555e-855f-5444cd88ff7f` |
 
 ## Architecture
 - Off-chain reporter (scripts/reporter.ts) fetches USDC/USD (5 CEX sources) and NGN/USD (3 server-friendly sources: CoinGecko USDT/NGN live, ExchangeRate-API cached 24h, CurrencyAPI cached 1h)
