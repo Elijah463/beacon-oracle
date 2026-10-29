@@ -174,11 +174,12 @@ The reporter fetches prices from external sources, derives the USDC/NGN rate, ch
 
 ### Frontend (Vercel)
 
-Connect the `beacon-oracle` repo to Vercel. Add one environment variable:
+Connect the `beacon-oracle` repo to Vercel. Add these environment variables:
 
 | Variable | Value |
 |---|---|
-| `VITE_ORACLE_ADDRESS` | `0x5147ebbc5d7124a27325a0ea04f6b552410ec90d` |
+| `VITE_ORACLE_CONTRACT_ADDRESS` | `0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797` |
+| `VITE_REPORTER_STATUS_URL` | `https://beacon-oracle.fly.dev/status` |
 
 Framework preset: **Vite**.
 

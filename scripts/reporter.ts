@@ -90,6 +90,7 @@ const reporterState = {
   circuitBreakerTripped: false,
   firstRoundDone:        false,
   startupError:          '' as string,
+  totalTransmissions:    0,
 }
 
 function startHealthServer(): void {
@@ -115,6 +116,7 @@ function startHealthServer(): void {
                                ? lastPublishedAt : null,
         circuitBreakerTripped: reporterState.circuitBreakerTripped,
         firstRoundDone:      reporterState.firstRoundDone,
+        totalTransmissions:  reporterState.totalTransmissions,
         uptime:              now,
       }, null, 2)
       res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -557,8 +559,9 @@ async function transmitPrice(price: bigint, timestamp: bigint, nextRoundId: bigi
   // Only update local state after confirmed on-chain
   lastPublishedAt    = Number(timestamp)
   lastPublishedPrice = price
+  reporterState.totalTransmissions++
 
-  console.log(`[transmit] CONFIRMED. Price: ${formatPrice(price)} | Timestamp: ${new Date(Number(timestamp) * 1000).toISOString()}`)
+  console.log(`[transmit] CONFIRMED. Price: ${formatPrice(price)} | Timestamp: ${new Date(Number(timestamp) * 1000).toISOString()} | Total transmissions: ${reporterState.totalTransmissions}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -630,6 +633,50 @@ async function loop(backoffMs = 0): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Startup: seed totalTransmissions from on-chain NewTransmission event count
+// ---------------------------------------------------------------------------
+
+// Arc Testnet proxy deploy block -- scan from here to avoid scanning from genesis.
+// This is set conservatively: well before the first transmission round.
+const PROXY_DEPLOY_BLOCK = 68_000_000n
+
+async function seedTransmissionCount(): Promise<void> {
+  if (!CONTRACT_ADDRESS) return
+  try {
+    const head = await publicClient.getBlockNumber()
+    // Scan in 5000-block batches to stay within RPC range limits
+    const BATCH = 5_000n
+    let from = PROXY_DEPLOY_BLOCK
+    let count = 0
+    while (from <= head) {
+      const to = from + BATCH - 1n < head ? from + BATCH - 1n : head
+      const logs = await publicClient.getLogs({
+        address: CONTRACT_ADDRESS,
+        event: {
+          type: 'event',
+          name: 'NewTransmission',
+          inputs: [
+            { type: 'uint32',  name: 'aggregatorRoundId', indexed: true },
+            { type: 'int256',  name: 'answer',            indexed: false },
+            { type: 'uint256', name: 'updatedAt',         indexed: false },
+            { type: 'address', name: 'transmitter',       indexed: false },
+          ],
+        },
+        fromBlock: from,
+        toBlock:   to,
+      })
+      count += logs.length
+      from = to + 1n
+    }
+    reporterState.totalTransmissions = count
+    console.log(`[BEACON] Seeded totalTransmissions: ${count} (scanned blocks ${PROXY_DEPLOY_BLOCK}-${head})`)
+  } catch (e) {
+    // Non-fatal -- counter starts at 0 and increments from here
+    console.warn('[BEACON] Could not seed transmission count:', safeMsg(e))
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Entry
 // ---------------------------------------------------------------------------
 
@@ -644,7 +691,7 @@ console.log(`[BEACON] Outlier filter:   10% max deviation from group median`)
 console.log('')
 
 if (missingVars.length === 0) {
-  void loop()
+  void seedTransmissionCount().then(() => loop())
 } else {
   console.error('[BEACON] Reporter loop NOT started due to missing env vars above.')
   console.error('[BEACON] Fix secrets on Fly.io and redeploy. Health server remains running.')

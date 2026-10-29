@@ -15,11 +15,13 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { arcTestnet } from 'viem/chains'
 import { ORACLE_ABI } from '@/lib/oracleAbi'
 
-const CONTRACT_ADDRESS  = import.meta.env.VITE_ORACLE_CONTRACT_ADDRESS as `0x${string}`
-const ORACLE_DECIMALS   = 8
-const SCALE             = 10 ** ORACLE_DECIMALS
-const POLL_INTERVAL_MS  = 15_000
-const PHASE_MASK        = BigInt('0xFFFFFFFFFFFFFFFF')
+const CONTRACT_ADDRESS   = import.meta.env.VITE_ORACLE_CONTRACT_ADDRESS as `0x${string}`
+const REPORTER_STATUS    = (import.meta.env.VITE_REPORTER_STATUS_URL ?? '') as string
+const ORACLE_DECIMALS    = 8
+const SCALE              = 10 ** ORACLE_DECIMALS
+const POLL_INTERVAL_MS   = 15_000
+const STATUS_INTERVAL_MS = 30_000
+const PHASE_MASK         = BigInt('0xFFFFFFFFFFFFFFFF')
 
 export interface RoundPoint {
   roundId:   number   // human counter (lower 64 bits of encoded id)
@@ -43,6 +45,7 @@ export interface OracleState {
   hasData:               boolean
   error:                 string | null
   loading:               boolean
+  totalTransmissions:    number | null
 }
 
 const EMPTY: OracleState = {
@@ -61,6 +64,7 @@ const EMPTY: OracleState = {
   hasData:               false,
   error:                 null,
   loading:               true,
+  totalTransmissions:    null,
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -214,6 +218,7 @@ export function useOracle(): OracleState {
         hasData:               true,
         error:                 null,
         loading:               false,
+        totalTransmissions:    prev.totalTransmissions,
       }))
     } catch (e) {
       const msg = (e as Error).message ?? 'Contract read failed'
@@ -229,6 +234,26 @@ export function useOracle(): OracleState {
     const id = setInterval(() => void poll(), POLL_INTERVAL_MS)
     return () => clearInterval(id)
   }, [poll])
+
+  // Poll reporter /status for totalTransmissions every 30s
+  useEffect(() => {
+    if (!REPORTER_STATUS) return
+    const fetchCount = async () => {
+      try {
+        const res = await fetch(REPORTER_STATUS, { signal: AbortSignal.timeout(8_000) })
+        if (!res.ok) return
+        const json = await res.json() as { totalTransmissions?: number }
+        if (typeof json.totalTransmissions === 'number') {
+          setState((prev) => ({ ...prev, totalTransmissions: json.totalTransmissions ?? null }))
+        }
+      } catch {
+        // Non-fatal -- reporter may be down or restarting
+      }
+    }
+    void fetchCount()
+    const id = setInterval(() => void fetchCount(), STATUS_INTERVAL_MS)
+    return () => clearInterval(id)
+  }, [])
 
   return state
 }
