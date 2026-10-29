@@ -119,77 +119,34 @@ export function OracleDashboard() {
 const PAGE_SIZE = 20
 
 function RoundHistoryTable({ history, loading }: { history: RoundPoint[]; loading: boolean }) {
-  // mode: 'latest' shows newest PAGE_SIZE rounds; 'history' shows paginated older rounds
-  const [mode, setMode] = useState<'latest' | 'history'>('latest')
-  const [histPage, setHistPage] = useState(1) // 1-indexed; page 0 is always 'latest'
+  // page 0 = newest rounds (latest), page 1 = next older block, etc.
+  const [page, setPage] = useState(0)
 
-  const reversed     = [...history].reverse()   // newest first
-  const totalPages   = Math.ceil(reversed.length / PAGE_SIZE)
-  const hasMore      = reversed.length > PAGE_SIZE
-
-  // Which rows to show
-  const pageRows = mode === 'latest'
-    ? reversed.slice(0, PAGE_SIZE)
-    : reversed.slice(histPage * PAGE_SIZE, (histPage + 1) * PAGE_SIZE)
+  const reversed   = [...history].reverse()            // newest first
+  const totalPages = Math.max(1, Math.ceil(reversed.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages - 1)    // clamp if history shrinks
+  const pageRows   = reversed.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
+  const onLatest   = safePage === 0
+  const onOldest   = safePage >= totalPages - 1
 
   const btnBase: React.CSSProperties = {
-    fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '5px 10px',
+    fontSize: 13, fontWeight: 700, borderRadius: 8, padding: '6px 14px',
     border: '1px solid var(--border)', background: 'var(--bg-muted)',
     color: 'var(--ink)', cursor: 'pointer',
   }
   const btnDisabled: React.CSSProperties = { ...btnBase, opacity: 0.3, cursor: 'default' }
+  const btnGreen: React.CSSProperties   = { ...btnBase, color: 'var(--brand)', border: '1px solid var(--brand-border)', background: 'rgba(0,214,111,0.08)' }
+
+  const showPagination = totalPages > 1
 
   return (
     <div style={{ borderRadius: 18, overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-      {/* Header */}
-      <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <div>
-          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--subtle)', margin: 0 }}>Round History</p>
-          <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', margin: '3px 0 0' }}>
-            {reversed.length > 0 ? `${reversed.length} on-chain round${reversed.length !== 1 ? 's' : ''}` : 'No rounds yet'}
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          {/* Mode toggle */}
-          {mode === 'latest' && hasMore && (
-            <button
-              onClick={() => { setMode('history'); setHistPage(1) }}
-              style={{ ...btnBase, color: 'var(--subtle)' }}
-            >
-              Previous rounds
-            </button>
-          )}
-          {mode === 'history' && (
-            <>
-              <button
-                onClick={() => { setMode('latest'); setHistPage(1) }}
-                style={{ ...btnBase, color: 'var(--brand)', border: '1px solid var(--brand-border)', background: 'rgba(0,214,111,0.08)' }}
-              >
-                Go to Latest
-              </button>
-              <button
-                onClick={() => setHistPage(p => Math.min(p + 1, totalPages - 1))}
-                disabled={histPage >= totalPages - 1}
-                style={histPage >= totalPages - 1 ? btnDisabled : btnBase}
-                title="Older"
-              >
-                {'<<<<'}
-              </button>
-              <span style={{ fontSize: 11, color: 'var(--subtle)', minWidth: 52, textAlign: 'center' }}>
-                {histPage + 1} / {totalPages}
-              </span>
-              <button
-                onClick={() => setHistPage(p => Math.max(p - 1, 1))}
-                disabled={histPage <= 1}
-                style={histPage <= 1 ? btnDisabled : btnBase}
-                title="Newer"
-              >
-                {'>>>>'}
-              </button>
-            </>
-          )}
-        </div>
+      {/* Header -- title + count only, no nav buttons here */}
+      <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--subtle)', margin: 0 }}>Round History</p>
+        <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', margin: '3px 0 0' }}>
+          {reversed.length > 0 ? `${reversed.length} on-chain round${reversed.length !== 1 ? 's' : ''}` : 'No rounds yet'}
+        </p>
       </div>
 
       {loading ? (
@@ -203,41 +160,62 @@ function RoundHistoryTable({ history, loading }: { history: RoundPoint[]; loadin
           <p style={{ fontSize: 13.5, color: 'var(--subtle)' }}>No rounds yet. The reporter publishes on first cycle.</p>
         </div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Round', 'Price (NGN)', 'Change', 'Updated At'].map((h) => (
-                  <th key={h} style={{ padding: '10px 20px', textAlign: 'left', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--subtle)', background: 'var(--bg)' }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map((row, idx) => {
-                const nextRow = pageRows[idx + 1]
-                const change  = nextRow ? ((row.price - nextRow.price) / nextRow.price) * 100 : null
-                const isUp    = change !== null && change > 0
-                const isDown  = change !== null && change < 0
-                return (
-                  <tr key={row.roundId} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '11px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: 'var(--subtle)' }}>#{row.roundId}</td>
-                    <td style={{ padding: '11px 20px', fontWeight: 600, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>
-                      {row.price.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td style={{ padding: '11px 20px', fontSize: 12, fontWeight: 600, color: isUp ? 'var(--success)' : isDown ? 'var(--danger)' : 'var(--subtle)', fontVariantNumeric: 'tabular-nums' }}>
-                      {change !== null ? `${change > 0 ? '+' : ''}${change.toFixed(3)}%` : '--'}
-                    </td>
-                    <td style={{ padding: '11px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: 'var(--subtle)' }}>
-                      {new Date(row.updatedAt * 1000).toLocaleTimeString()}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  {['Round', 'Price (NGN)', 'Change', 'Updated At'].map((h) => (
+                    <th key={h} style={{ padding: '10px 20px', textAlign: 'left', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--subtle)', background: 'var(--bg)' }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((row, idx) => {
+                  const nextRow = pageRows[idx + 1]
+                  const change  = nextRow ? ((row.price - nextRow.price) / nextRow.price) * 100 : null
+                  const isUp    = change !== null && change > 0
+                  const isDown  = change !== null && change < 0
+                  return (
+                    <tr key={row.roundId} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '11px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: 'var(--subtle)' }}>#{row.roundId}</td>
+                      <td style={{ padding: '11px 20px', fontWeight: 600, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>
+                        {row.price.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td style={{ padding: '11px 20px', fontSize: 12, fontWeight: 600, color: isUp ? 'var(--success)' : isDown ? 'var(--danger)' : 'var(--subtle)', fontVariantNumeric: 'tabular-nums' }}>
+                        {change !== null ? `${change > 0 ? '+' : ''}${change.toFixed(3)}%` : '--'}
+                      </td>
+                      <td style={{ padding: '11px 20px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: 'var(--subtle)' }}>
+                        {new Date(row.updatedAt * 1000).toLocaleTimeString()}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          {showPagination && (
+            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+              {!onLatest
+                ? <button onClick={() => setPage(0)} style={btnGreen}>Go to Latest</button>
+                : <span />
+              }
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button onClick={() => setPage(p => p + 1)} disabled={onOldest} style={onOldest ? btnDisabled : btnBase} title="Older rounds">
+                  {'<<<<'}
+                </button>
+                <span style={{ fontSize: 12, color: 'var(--subtle)', minWidth: 56, textAlign: 'center' }}>
+                  {safePage + 1} / {totalPages}
+                </span>
+                <button onClick={() => setPage(p => Math.max(p - 1, 0))} disabled={onLatest} style={onLatest ? btnDisabled : btnBase} title="Newer rounds">
+                  {'>>>>'}
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
