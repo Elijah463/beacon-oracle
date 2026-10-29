@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { Activity, Sliders, ShieldAlert, Hash, Info, Database } from 'lucide-react'
+import { Activity, Sliders, ShieldAlert, Hash, Info } from 'lucide-react'
 
 interface OracleStatsProps {
   maxStaleness: number | null
   deviationThresholdBps: number | null
   circuitBreakerBps: number | null
   roundId: number | null
-  totalTransmissions: number | null
 }
 
 const TOOLTIPS: Record<string, string> = {
@@ -14,7 +13,6 @@ const TOOLTIPS: Record<string, string> = {
   'Heartbeat': 'Maximum time between on-chain publishes. Even if the price is stable, a new round is forced at least once per heartbeat period to prove the reporter is alive.',
   'Deviation Threshold': 'Minimum price movement required to trigger a new on-chain publish. If the price moves less than this amount since the last round, the reporter skips the update and waits for the heartbeat. Measured in basis points (1 bps = 0.01%).',
   'Circuit Breaker': 'If a single price update would move the on-chain price by more than this threshold, the contract blocks the update and sets a trip flag. The owner must manually reset it. Protects against data source errors or manipulation.',
-  'Total Transmissions': 'The total number of on-chain price updates the reporter has successfully submitted since the contract was deployed. Counted from NewTransmission events emitted by the contract.',
 }
 
 function StatCard({ icon, label, value, mono }: { icon: React.ReactNode; label: string; value: string; mono: boolean }) {
@@ -58,7 +56,6 @@ function StatCard({ icon, label, value, mono }: { icon: React.ReactNode; label: 
         {value}
       </p>
 
-      {/* Tooltip */}
       {show && tip && (
         <div style={{
           position: 'absolute', bottom: 'calc(100% + 8px)', left: 0,
@@ -76,7 +73,7 @@ function StatCard({ icon, label, value, mono }: { icon: React.ReactNode; label: 
   )
 }
 
-export function OracleStats({ maxStaleness, deviationThresholdBps, circuitBreakerBps, roundId, totalTransmissions }: OracleStatsProps) {
+export function OracleStats({ maxStaleness, deviationThresholdBps, circuitBreakerBps, roundId }: OracleStatsProps) {
   const stats = [
     {
       icon: <Hash size={15} style={{ color: 'var(--brand)' }} />,
@@ -102,16 +99,10 @@ export function OracleStats({ maxStaleness, deviationThresholdBps, circuitBreake
       value: circuitBreakerBps !== null ? `${(circuitBreakerBps / 100).toFixed(0)}%` : '--',
       mono: false,
     },
-    {
-      icon: <Database size={15} style={{ color: 'var(--brand)' }} />,
-      label: 'Total Transmissions',
-      value: totalTransmissions !== null ? totalTransmissions.toLocaleString() : '--',
-      mono: true,
-    },
   ]
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {stats.map((s) => (
         <StatCard key={s.label} {...s} />
       ))}

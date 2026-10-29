@@ -686,3 +686,17 @@
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793277075214}
 {"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793277086379}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793277086379}
+{"level":"debug","message":"[vite] connected.","timestamp":1793277162660}
+{"level":"debug","message":"[vite] hot updated: /src/components/QuoteCalculator.tsx","timestamp":1793277406970}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793277406971}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793277939472}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793277939473}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793277941584}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793277941585}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793277944580}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793277944581}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793277946376}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793277946377}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793277950099}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793277950100}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793277970143}

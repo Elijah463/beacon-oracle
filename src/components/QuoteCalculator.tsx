@@ -9,6 +9,7 @@ import { usePublicClient } from 'wagmi'
 import { arcTestnet } from 'viem/chains'
 import { ArrowUpDown, Loader2, AlertCircle } from 'lucide-react'
 import { ORACLE_ABI } from '@/lib/oracleAbi'
+import { formatCompact } from '@/lib/formatNumber'
 
 const CONTRACT_ADDRESS = import.meta.env.VITE_ORACLE_CONTRACT_ADDRESS as `0x${string}`
 const USDC_DECIMALS = 6
@@ -17,10 +18,10 @@ const NGN_DECIMALS  = 2
 type Direction = 'usdc-to-ngn' | 'ngn-to-usdc'
 
 function formatNGN(raw: bigint): string {
-  return (Number(raw) / 10 ** NGN_DECIMALS).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return formatCompact(Number(raw) / 10 ** NGN_DECIMALS, 2)
 }
 function formatUSDC(raw: bigint): string {
-  return (Number(raw) / 10 ** USDC_DECIMALS).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return formatCompact(Number(raw) / 10 ** USDC_DECIMALS, 2)
 }
 
 // Simple SVG circle logos

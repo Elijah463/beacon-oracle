@@ -121,9 +121,7 @@ export function PriceChart({ history, price: _price, loading }: PriceChartProps)
       // label
       ctx.fillStyle = 'rgba(100,116,139,0.9)'
       ctx.fillText(
-        tick >= 10000
-          ? `${(tick / 1000).toFixed(0)}k`
-          : tick.toLocaleString(),
+        tick.toLocaleString('en-US', { maximumFractionDigits: 0 }),
         PAD_L - 6,
         cy + 4,
       )

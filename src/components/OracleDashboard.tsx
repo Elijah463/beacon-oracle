@@ -77,7 +77,6 @@ export function OracleDashboard({ onNavigate }: { onNavigate?: NavigateFn }) {
             deviationThresholdBps={oracle.deviationThresholdBps}
             circuitBreakerBps={oracle.circuitBreakerBps}
             roundId={oracle.roundId}
-            totalTransmissions={oracle.totalTransmissions}
           />
         </div>
 
