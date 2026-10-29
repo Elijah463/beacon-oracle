@@ -58,8 +58,8 @@ Example: 1 USDC = 1,620.50 NGN stored as `162050000000`.
 ## Smart Contract
 
 **Network:** Arc Network
-**Address:** `0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797` (ERC1967 proxy)
-**Explorer:** https://explorer.arc.io/address/0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797
+**Address:** `0xe0e4894106B1e517752515D40601ec890262e0ea` (ERC1967 proxy)
+**Explorer:** https://explorer.arc.io/address/0xe0e4894106B1e517752515D40601ec890262e0ea
 
 ### Key functions
 
@@ -178,7 +178,7 @@ Connect the `beacon-oracle` repo to Vercel. Add these environment variables:
 
 | Variable | Value |
 |---|---|
-| `VITE_ORACLE_CONTRACT_ADDRESS` | `0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797` |
+| `VITE_ORACLE_CONTRACT_ADDRESS` | `0xe0e4894106B1e517752515D40601ec890262e0ea` |
 | `VITE_REPORTER_STATUS_URL` | `https://beacon-oracle.fly.dev/status` |
 
 Framework preset: **Vite**.

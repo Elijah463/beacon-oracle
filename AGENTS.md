@@ -5,13 +5,13 @@
 ### LIVE CONTRACT (owner-controlled, use this one)
 | Field | Value |
 |---|---|
-| Proxy address | `0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797` |
-| Implementation | `0x71d2fe7ca6bb8ead42a5bde78d64a1bb07ea7779` (v7 -- transmit open to any sender, ECDSA-only auth) |
+| Proxy address | `0xe0e4894106B1e517752515D40601ec890262e0ea` |
+| Implementation | `0x96a8858464C9BdCf767949040a2fa66dcae6D41b` (v1 mainnet -- ECDSA-only auth, initialized with reporter/staleness/deviation/circuit breaker) |
 | Owner wallet | `0xBA29b16Adbf5F1D7dD2CeD98fE57189388c65B76` |
 | Reporter signing address | `0xdCF40c61Cc7A1D9A9C7F90f0be80A05797757d7b` |
 | Deployed via | `forge script contracts/script/DeployBeacon.s.sol` |
-| Explorer | https://explorer.arc.io/address/0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 |
-| Network | Arc Network (chainId 5042) |
+| Explorer | https://explorer.arc.io/address/0xe0e4894106B1e517752515D40601ec890262e0ea |
+| Network | Arc Network mainnet (chainId 5042) |
 | Contract version | v6 (UUPS upgradeable, phaseId encoding, ECDSA signature verification, typeAndVersion) |
 
 ### Previous deployments (Circle SCP deployer -- owner is Circle wallet, not usable for governance)
@@ -44,20 +44,20 @@
 ## Key Commands
 ```bash
 # Check current reporter
-cast call 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "reporter()(address)" --rpc-url https://rpc.mainnet.arc.io
+cast call 0xe0e4894106B1e517752515D40601ec890262e0ea "reporter()(address)" --rpc-url https://rpc.mainnet.arc.io
 
 # Check circuit breaker
-cast call 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "circuitBreakerTripped()(bool)" --rpc-url https://rpc.mainnet.arc.io
+cast call 0xe0e4894106B1e517752515D40601ec890262e0ea "circuitBreakerTripped()(bool)" --rpc-url https://rpc.mainnet.arc.io
 
 # Check latest round
-cast call 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "latestRound()(uint256)" --rpc-url https://rpc.mainnet.arc.io
+cast call 0xe0e4894106B1e517752515D40601ec890262e0ea "latestRound()(uint256)" --rpc-url https://rpc.mainnet.arc.io
 
 # Reset circuit breaker (owner only)
-cast send 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "resetCircuitBreaker()" --private-key $OWNER_PRIVATE_KEY --rpc-url https://rpc.mainnet.arc.io
+cast send 0xe0e4894106B1e517752515D40601ec890262e0ea "resetCircuitBreaker()" --private-key $OWNER_PRIVATE_KEY --rpc-url https://rpc.mainnet.arc.io
 
 # Set reporter signing address (owner only)
-cast send 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "setReporter(address)" <NEW_ADDRESS> --private-key $OWNER_PRIVATE_KEY --rpc-url https://rpc.mainnet.arc.io
+cast send 0xe0e4894106B1e517752515D40601ec890262e0ea "setReporter(address)" <NEW_ADDRESS> --private-key $OWNER_PRIVATE_KEY --rpc-url https://rpc.mainnet.arc.io
 
 # Upgrade implementation (owner only)
-cast send 0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797 "upgradeToAndCall(address,bytes)" <NEW_IMPL> 0x --private-key $OWNER_PRIVATE_KEY --rpc-url https://rpc.mainnet.arc.io
+cast send 0xe0e4894106B1e517752515D40601ec890262e0ea "upgradeToAndCall(address,bytes)" <NEW_IMPL> 0x --private-key $OWNER_PRIVATE_KEY --rpc-url https://rpc.mainnet.arc.io
 ```

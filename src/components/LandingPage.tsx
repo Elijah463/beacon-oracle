@@ -16,7 +16,7 @@ interface LandingPageProps {
   onOpenDocs: () => void
 }
 
-const CONTRACT    = '0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797'
+const CONTRACT    = '0xe0e4894106B1e517752515D40601ec890262e0ea'
 const EXPLORER    = `https://explorer.arc.io/address/${CONTRACT}`
 const SHORT_CONTRACT = `${CONTRACT.slice(0, 8)}...${CONTRACT.slice(-6)}`
 
