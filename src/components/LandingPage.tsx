@@ -537,9 +537,14 @@ export function LandingFooter({ onEnterDashboard, onOpenDocs }: { onEnterDashboa
         </div>
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <span style={{ fontSize: 12, color: '#1e293b' }}>&copy; {CURRENT_YEAR} BEACON. Built on Arc by Circle.</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00D66F', display: 'inline-block' }} />
-            <span style={{ fontSize: 12, color: '#334155' }}>Arc Testnet</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <a href="https://studio.arc.io/" target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#1e3a5f', textDecoration: 'none', letterSpacing: '0.01em' }}>
+              Built with Arc Studio
+            </a>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00D66F', display: 'inline-block' }} />
+              <span style={{ fontSize: 12, color: '#334155' }}>Arc Testnet</span>
+            </div>
           </div>
         </div>
       </div>

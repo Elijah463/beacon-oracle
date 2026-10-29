@@ -575,3 +575,24 @@
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793226415948}
 {"level":"debug","message":"(previous line repeated 1× more)","timestamp":1793226417489}
 {"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793226417489}
+{"level":"debug","message":"(previous line repeated 1× more)","timestamp":1793226419448}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1793226419448}
+{"level":"debug","message":"[vite] connected.","timestamp":1793236341303}
+{"level":"debug","message":"[vite] connected.","timestamp":1793236341400}
+{"level":"debug","message":"[vite] connected.","timestamp":1793236343061}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793236520863}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793236520866}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793236521090}
+{"level":"debug","message":"[vite] hot updated: /src/components/OracleDashboard.tsx","timestamp":1793236521090}
+{"level":"error","message":"Warning: You are calling ReactDOMClient.createRoot() on a container that has already been passed to createRoot() before. Instead, call root.render() on the existing root instead if you want to update it.","timestamp":1793236532960}
+{"level":"debug","message":"[vite] invalidate /src/main.tsx: Could not Fast Refresh (\"true\" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports","timestamp":1793236532963}
+{"level":"debug","message":"[vite] hot updated: /src/main.tsx","timestamp":1793236532964}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793236532964}
+{"level":"error","message":"Warning: You are calling ReactDOMClient.createRoot() on a container that has already been passed to createRoot() before. Instead, call root.render() on the existing root instead if you want to update it.","timestamp":1793236533293}
+{"level":"debug","message":"[vite] invalidate /src/main.tsx: Could not Fast Refresh (\"true\" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports","timestamp":1793236533296}
+{"level":"debug","message":"[vite] hot updated: /src/main.tsx","timestamp":1793236533296}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793236533296}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793236541351}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793236541352}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793236541472}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793236541472}

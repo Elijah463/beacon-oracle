@@ -104,7 +104,8 @@ export function useOracle(): OracleState {
       if (!publicClient) return []
       const phasePrefix = encodedLatest & ~PHASE_MASK
       const counter     = encodedLatest &  PHASE_MASK
-      const startCount  = counter > 19n ? counter - 19n : 1n
+      // Fetch all rounds up to 200; beyond that start from (counter - 199)
+      const startCount  = counter > 199n ? counter - 199n : 1n
       const ids: bigint[] = []
       for (let i = startCount; i <= counter; i++) ids.push(phasePrefix | i)
 
