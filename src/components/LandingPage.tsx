@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Shield, Zap, Clock, GitBranch, BookOpen } from 'lucide-react'
-import { BeaconLogo } from './BeaconLogo'
+import { BeaconMark } from './BeaconLogo'
 
 interface LandingPageProps {
   onEnterDashboard: () => void
@@ -333,8 +333,8 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <BeaconLogo size={30} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <BeaconMark size={28} />
             <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em', lineHeight: 1 }}>BEACON</span>
           </div>
         </div>
@@ -503,8 +503,8 @@ export function LandingFooter({ onEnterDashboard, onOpenDocs }: { onEnterDashboa
       <div style={{ maxWidth: 1040, margin: '0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 40, marginBottom: 40 }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <BeaconLogo size={26} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <BeaconMark size={24} />
               <span style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em', lineHeight: 1 }}>BEACON</span>
             </div>
             <p style={{ marginTop: 12, fontSize: 13, color: '#475569', lineHeight: 1.65, maxWidth: 200 }}>

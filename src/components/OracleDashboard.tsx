@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react'
-import { ExternalLink } from 'lucide-react'
+import { LandingFooter } from './LandingPage'
 import { useOracle } from '@/hooks/useOracle'
 import { RateCard } from './RateCard'
 import { PriceChart } from './PriceChart'
@@ -12,11 +12,10 @@ import { CircuitBreakerBanner } from './CircuitBreakerBanner'
 import { OracleStats } from './OracleStats'
 import { ReporterInfo } from './ReporterInfo'
 import { QuoteCalculator } from './QuoteCalculator'
-import { BeaconLogo } from './BeaconLogo'
+import { BeaconMark } from './BeaconLogo'
 import type { RoundPoint } from '@/hooks/useOracle'
 
 const CONTRACT_ADDRESS = import.meta.env.VITE_ORACLE_CONTRACT_ADDRESS as string
-const EXPLORER = `https://explorer.testnet.arc.io/address/${CONTRACT_ADDRESS}`
 
 export function OracleDashboard() {
   const oracle = useOracle()
@@ -32,8 +31,8 @@ export function OracleDashboard() {
         background: 'rgba(6,10,18,0.92)', backdropFilter: 'blur(16px)',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <BeaconLogo size={28} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <BeaconMark size={26} />
           <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em', lineHeight: 1 }}>BEACON</span>
         </div>
       </nav>
@@ -96,22 +95,7 @@ export function OracleDashboard() {
         )}
       </main>
 
-      {/* Dashboard footer */}
-      <footer style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(6,10,18,0.95)', padding: '16px 24px' }}>
-        <div style={{ maxWidth: 1152, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <BeaconLogo size={22} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em', lineHeight: 1 }}>BEACON</span>
-          </div>
-          <a href={EXPLORER} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', textDecoration: 'none', fontFamily: "'JetBrains Mono', monospace", display: 'flex', alignItems: 'center', gap: 4 }}>
-            {CONTRACT_ADDRESS} <ExternalLink size={10} />
-          </a>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00D66F', display: 'inline-block', boxShadow: '0 0 6px #00D66F' }} />
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>Arc Testnet</span>
-          </div>
-        </div>
-      </footer>
+      <LandingFooter />
     </div>
   )
 }

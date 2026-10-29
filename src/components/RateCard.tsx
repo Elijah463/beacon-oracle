@@ -53,8 +53,7 @@ export function RateCard({ price, roundId, secondsAgo, isStale, loading, history
       position: 'relative', borderRadius: 18, padding: '24px 28px', overflow: 'hidden',
       background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)',
     }}>
-      {/* Brand accent strip */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'var(--brand)', borderRadius: '18px 18px 0 0' }} />
+
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
@@ -77,7 +76,10 @@ export function RateCard({ price, roundId, secondsAgo, isStale, loading, history
         }}>
           {isStale
             ? <><AlertTriangle size={11} /> Stale</>
-            : <><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00D66F', display: 'inline-block', animation: 'beacon-pulse 2s infinite' }} /> Live</>
+            : <>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00D66F', display: 'inline-block', animation: 'live-glow 2s ease-in-out infinite' }} />
+              Live
+            </>
           }
         </div>
       </div>
@@ -129,6 +131,12 @@ export function RateCard({ price, roundId, secondsAgo, isStale, loading, history
           </span>
         )}
       </div>
+      <style>{`
+        @keyframes live-glow {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(0,214,111,0.8), 0 0 4px 1px rgba(0,214,111,0.5); opacity: 1; }
+          50%       { box-shadow: 0 0 0 5px rgba(0,214,111,0), 0 0 10px 3px rgba(0,214,111,0.3); opacity: 0.7; }
+        }
+      `}</style>
     </div>
   )
 }

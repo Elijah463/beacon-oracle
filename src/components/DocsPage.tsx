@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Copy, Check, ExternalLink } from 'lucide-react'
-import { BeaconLogo } from './BeaconLogo'
+import { BeaconMark } from './BeaconLogo'
 
 const CONTRACT = '0x8A9bC80E846125ABA50B8936fD47cdB7cBc44797'
 const EXPLORER = `https://explorer.testnet.arc.io/address/${CONTRACT}`
@@ -821,10 +821,10 @@ export function DocsPage() {
         padding: '0 20px', height: 60,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <BeaconLogo size={28} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <BeaconMark size={26} />
           <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em', lineHeight: 1 }}>BEACON</span>
-          <span style={{ color: '#334155', fontSize: 14, marginLeft: 2 }}>/</span>
+          <span style={{ color: '#334155', fontSize: 14, marginLeft: 4 }}>/</span>
           <span style={{ color: '#64748b', fontSize: 14 }}>Docs</span>
         </div>
 
