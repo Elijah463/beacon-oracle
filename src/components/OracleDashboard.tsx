@@ -17,7 +17,9 @@ import type { RoundPoint } from '@/hooks/useOracle'
 
 const CONTRACT_ADDRESS = import.meta.env.VITE_ORACLE_CONTRACT_ADDRESS as string
 
-export function OracleDashboard() {
+type NavigateFn = (v: 'landing' | 'dashboard' | 'docs') => void
+
+export function OracleDashboard({ onNavigate }: { onNavigate?: NavigateFn }) {
   const oracle = useOracle()
 
   return (
@@ -95,7 +97,10 @@ export function OracleDashboard() {
         )}
       </main>
 
-      <LandingFooter />
+      <LandingFooter
+        onEnterDashboard={onNavigate ? () => onNavigate('dashboard') : undefined}
+        onOpenDocs={onNavigate ? () => onNavigate('docs') : undefined}
+      />
     </div>
   )
 }

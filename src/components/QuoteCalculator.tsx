@@ -83,7 +83,7 @@ export function QuoteCalculator() {
   const handleConvert = useCallback(async () => {
     if (!publicClient) return
     const parsed = parseFloat(inputValue.replace(/,/g, ''))
-    if (!isFinite(parsed) || parsed <= 0) { setError('Enter a valid positive amount.'); return }
+    if (!isFinite(parsed) || parsed <= 0) { setError('Enter a valid amount.'); return }
     setLoading(true); setError(null); setOutputValue(null)
     try {
       if (direction === 'usdc-to-ngn') {
@@ -102,11 +102,12 @@ export function QuoteCalculator() {
         setOutputValue(formatUSDC(result))
       }
     } catch (e) {
-      const msg = (e as Error).message ?? 'Conversion failed'
-      if (msg.toLowerCase().includes('stale'))   setError('Oracle price is stale.')
-      else if (msg.toLowerCase().includes('nodata') || msg.toLowerCase().includes('no data')) setError('No price data on-chain yet.')
-      else if (msg.toLowerCase().includes('circuit')) setError('Circuit breaker is active.')
-      else setError(msg)
+      const msg = (e as Error).message ?? ''
+      if (msg.toLowerCase().includes('stale'))                                           setError('Price is stale. Reporter may be down.')
+      else if (msg.toLowerCase().includes('nodata') || msg.toLowerCase().includes('no data')) setError('No price yet. Check back soon.')
+      else if (msg.toLowerCase().includes('circuit'))                                    setError('Circuit breaker active. Rates paused.')
+      else if (msg.toLowerCase().includes('paused'))                                     setError('Oracle is paused.')
+      else                                                                               setError('Could not fetch rate. Try again.')
     } finally {
       setLoading(false)
     }

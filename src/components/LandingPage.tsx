@@ -36,56 +36,58 @@ function OrderbookCanvas() {
     let raf: number
     type Pair = 'USDC/USD' | 'NGN/USD'
     let pair: Pair = 'USDC/USD'
-    let pairSwitchAt = Date.now() + 12000  // 12 seconds per pair
-
-    type Row = {
-      y: number
-      price: string
-      size: string
-      alpha: number
-      speed: number
-      isBuy: boolean
-      flickerAt: number
-    }
-    let rows: Row[] = []
+    let pairSwitchAt = Date.now() + 12000
 
     const rand = (min: number, max: number) => Math.random() * (max - min) + min
 
-    // Generate a price value strictly for the given pair
-    const priceForPair = (p: Pair): string => {
-      if (p === 'USDC/USD') {
-        return rand(0.9988, 1.0012).toFixed(4)
-      }
-      // NGN/USD strictly 1300-1600
-      return rand(1300, 1600).toFixed(2)
-    }
+    const priceForPair = (p: Pair): string =>
+      p === 'USDC/USD' ? rand(0.9988, 1.0012).toFixed(4) : rand(1300, 1600).toFixed(2)
 
     const sizeVal = () => {
       const n = rand(10, 99999)
       return n > 1000 ? n.toFixed(0) : n.toFixed(2)
     }
 
-    const buildRows = (p: Pair) => {
+    // 3 independent column-pairs: each has its own rows, speed offset, and flicker cadence
+    type Row = { y: number; price: string; size: string; alpha: number; speed: number; isBuy: boolean; flickerAt: number }
+    type ColPair = { rows: Row[]; speedOffset: number; sideOffset: number } // sideOffset: left offset from centre
+
+    // Three column pairs spread across the canvas width
+    // Layout: [pair0]   [pair1]   [pair2]
+    // Each pair = price_col (right-aligned) | 14px gutter | size_col (left-aligned)
+    // Pair1 is dead-centre, pair0 is 220px left of centre, pair2 is 220px right
+    const PAIR_OFFSETS = [-220, 0, 220]
+
+    let colPairs: ColPair[] = []
+
+    const buildColPair = (p: Pair, speedOffset: number, sideOff: number): ColPair => {
       const rowH  = 20
       const count = Math.floor(canvas.height / rowH)
-      rows = Array.from({ length: count }, (_, j) => ({
-        y:        j * rowH + 14,
-        price:    priceForPair(p),
-        size:     sizeVal(),
-        alpha:    rand(0.22, 0.60),
-        speed:    rand(0.0005, 0.0020),
-        isBuy:    Math.random() > 0.5,
-        flickerAt: Date.now() + rand(800, 3200),
-      }))
+      return {
+        sideOffset: sideOff,
+        speedOffset,
+        rows: Array.from({ length: count }, (_, j) => ({
+          y:         j * rowH + 14,
+          price:     priceForPair(p),
+          size:      sizeVal(),
+          alpha:     rand(0.20, 0.55),
+          speed:     rand(0.0004, 0.0018),
+          isBuy:     Math.random() > 0.5,
+          flickerAt: Date.now() + rand(600 + speedOffset * 200, 3000 + speedOffset * 200),
+        })),
+      }
+    }
+
+    const buildAllCols = (p: Pair) => {
+      colPairs = PAIR_OFFSETS.map((off, i) => buildColPair(p, i * 0.3, off))
     }
 
     const resize = () => {
       canvas.width  = canvas.offsetWidth
       canvas.height = canvas.offsetHeight
-      buildRows(pair)
+      buildAllCols(pair)
     }
 
-    // Label: top-left, well away from the number columns
     const drawLabel = () => {
       ctx.save()
       ctx.globalAlpha = 0.60
@@ -101,43 +103,38 @@ function OrderbookCanvas() {
       t++
       const now = Date.now()
 
-      // Switch pair -- replace ALL rows immediately so no wrong values linger
       if (now > pairSwitchAt) {
         pair = pair === 'USDC/USD' ? 'NGN/USD' : 'USDC/USD'
         pairSwitchAt = now + 12000
-        buildRows(pair)
+        buildAllCols(pair)
       }
 
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.font = '11px "JetBrains Mono", monospace'
 
-      // Two columns centred as a block:
-      // |<-- priceW -->|<-- gutter -->|<-- sizeW -->|
-      // Price column is right-aligned, size column is left-aligned.
-      // Total block width = priceW + gutter + sizeW, centred on midX.
-      const midX    = canvas.width / 2
-      const gutter  = 20
-      const priceX  = midX - gutter / 2               // right edge of price col
-      const sizeX   = midX + gutter / 2               // left edge of size col
+      const midX   = canvas.width / 2
+      const gutter = 14
 
-      for (const row of rows) {
-        // Slow sinusoidal alpha pulse
-        const pulse = Math.sin(t * row.speed * 60 + row.y) * 0.5 + 0.5
-        ctx.globalAlpha = row.alpha * (0.45 + pulse * 0.55)
+      for (const cp of colPairs) {
+        const priceX = midX + cp.sideOffset - gutter / 2
+        const sizeX  = midX + cp.sideOffset + gutter / 2
 
-        ctx.fillStyle = row.isBuy ? '#22c55e' : '#ef4444'
+        for (const row of cp.rows) {
+          const pulse = Math.sin((t + cp.speedOffset * 120) * row.speed * 60 + row.y) * 0.5 + 0.5
+          ctx.globalAlpha = row.alpha * (0.4 + pulse * 0.6)
+          ctx.fillStyle = row.isBuy ? '#22c55e' : '#ef4444'
 
-        ctx.textAlign = 'right'
-        ctx.fillText(row.price, priceX, row.y)
-        ctx.textAlign = 'left'
-        ctx.fillText(row.size,  sizeX,  row.y)
+          ctx.textAlign = 'right'
+          ctx.fillText(row.price, priceX, row.y)
+          ctx.textAlign = 'left'
+          ctx.fillText(row.size,  sizeX,  row.y)
 
-        // Flicker individual rows on their own schedule
-        if (now > row.flickerAt) {
-          row.price    = priceForPair(pair)
-          row.size     = sizeVal()
-          row.isBuy    = Math.random() > 0.5
-          row.flickerAt = now + rand(600, 3000)
+          if (now > row.flickerAt) {
+            row.price     = priceForPair(pair)
+            row.size      = sizeVal()
+            row.isBuy     = Math.random() > 0.5
+            row.flickerAt = now + rand(500, 2800)
+          }
         }
       }
 

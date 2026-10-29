@@ -781,7 +781,9 @@ function SidebarContents({ activeIdx, onSelect }: { activeIdx: number; onSelect:
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
-export function DocsPage() {
+type NavigateFn = (v: 'landing' | 'dashboard' | 'docs') => void
+
+export function DocsPage({ onNavigate: _onNavigate }: { onNavigate?: NavigateFn } = {}) {
   const [activeIdx, setActiveIdx]   = useState(0)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
