@@ -9,7 +9,7 @@ import { usePublicClient } from 'wagmi'
 import { arc } from 'viem/chains'
 import { ArrowUpDown, Loader2, AlertCircle } from 'lucide-react'
 import { ORACLE_ABI } from '@/lib/oracleAbi'
-import { formatCompact } from '@/lib/formatNumber'
+import { formatCompact, parseDecimalToBigInt } from '@/lib/formatNumber'
 
 const CONTRACT_ADDRESS = import.meta.env.VITE_ORACLE_CONTRACT_ADDRESS as `0x${string}`
 const USDC_DECIMALS = 6
@@ -83,19 +83,20 @@ export function QuoteCalculator() {
 
   const handleConvert = useCallback(async () => {
     if (!publicClient) return
-    const parsed = parseFloat(inputValue.replace(/,/g, ''))
-    if (!isFinite(parsed) || parsed <= 0) { setError('Enter a valid amount.'); return }
+    // H2 fix: parse using string arithmetic to avoid IEEE-754 float precision loss.
+    // e.g. "12345678.99" with 6 decimals => 12345678990000n exactly, no rounding error.
+    const raw = inputValue.replace(/,/g, '')
+    const atomicIn = parseDecimalToBigInt(raw, direction === 'usdc-to-ngn' ? USDC_DECIMALS : NGN_DECIMALS)
+    if (atomicIn === null || atomicIn <= 0n) { setError('Enter a valid amount.'); return }
     setLoading(true); setError(null); setOutputValue(null)
     try {
       if (direction === 'usdc-to-ngn') {
-        const atomicIn = BigInt(Math.round(parsed * 10 ** USDC_DECIMALS))
         const result = await publicClient.readContract({
           address: CONTRACT_ADDRESS, abi: ORACLE_ABI,
           functionName: 'quoteUSDCToNGN', args: [atomicIn],
         })
         setOutputValue(formatNGN(result))
       } else {
-        const atomicIn = BigInt(Math.round(parsed * 10 ** NGN_DECIMALS))
         const result = await publicClient.readContract({
           address: CONTRACT_ADDRESS, abi: ORACLE_ABI,
           functionName: 'quoteNGNToUSDC', args: [atomicIn],

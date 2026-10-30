@@ -189,8 +189,10 @@ const ORACLE_SCALE    = 10n ** ORACLE_DECIMALS
 
 // Cycle: fetch price every 30 seconds
 const CYCLE_INTERVAL_MS  = 30_000
-// Deviation gate: only publish if price moved >= 0.2% (20 bps)
-const DEVIATION_GATE_BPS = 20n
+// Deviation gate: read from contract at startup (see initDeviationGate).
+// Fallback to 10 bps (0.1%) -- matches the on-chain deployment config.
+// Using a mutable let so it can be updated once the chain is reachable.
+let DEVIATION_GATE_BPS = 10n
 // Heartbeat: force publish if no update for 1 hour regardless of deviation
 const HEARTBEAT_SECS     = 3600
 // Quorum: minimum live sources required per leg before aggregation
@@ -242,6 +244,10 @@ const ORACLE_ABI = [
   {
     type: 'function', name: 'circuitBreakerTripped',
     inputs: [], outputs: [{ name: '', type: 'bool' }], stateMutability: 'view',
+  },
+  {
+    type: 'function', name: 'deviationThresholdBps',
+    inputs: [], outputs: [{ name: '', type: 'uint256' }], stateMutability: 'view',
   },
 ] as const
 
@@ -555,10 +561,33 @@ async function transmitPrice(price: bigint, timestamp: bigint, nextRoundId: bigi
     throw new Error(`Transmit tx ended in state ${finalState} (txId: ${txId})`)
   }
 
-  // Only update local state after confirmed on-chain
+  // C2 fix: verify the round was actually stored on-chain.
+  // When the circuit breaker trips, transmit() returns success (no revert) but
+  // does NOT write the round. Circle tx state is COMPLETE either way.
+  // We read latestRound() and confirm it equals nextRoundId before updating local state.
+  const roundAfter = await publicClient.readContract({
+    address: CONTRACT_ADDRESS,
+    abi: ORACLE_ABI,
+    functionName: 'latestRound',
+  }).catch(() => null)
+
+  const counterAfter = roundAfter !== null
+    ? BigInt(roundAfter) & BigInt('0xFFFFFFFFFFFFFFFF')
+    : null
+
+  if (counterAfter === null || counterAfter < nextRoundId) {
+    // Round was not stored -- circuit breaker tripped or other silent failure
+    console.error(`[transmit] WARNING: tx COMPLETE but latestRound counter (${counterAfter}) < expected (${nextRoundId})`)
+    console.error(`[transmit] Circuit breaker likely tripped. NOT updating local published state.`)
+    // Trigger breaker detection on next cycle by NOT updating state here.
+    // refreshOnChainState() will detect circuitBreakerTripped = true and exit.
+    return
+  }
+
+  // Only update local state after confirmed on-chain round write
   lastPublishedAt    = Number(timestamp)
   lastPublishedPrice = price
-  console.log(`[transmit] CONFIRMED. Price: ${formatPrice(price)} | Timestamp: ${new Date(Number(timestamp) * 1000).toISOString()}`)
+  console.log(`[transmit] CONFIRMED. Round ${nextRoundId} stored. Price: ${formatPrice(price)} | Timestamp: ${new Date(Number(timestamp) * 1000).toISOString()}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -630,6 +659,24 @@ async function loop(backoffMs = 0): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Startup: read deviationThresholdBps from chain so reporter matches contract
+// ---------------------------------------------------------------------------
+
+async function initDeviationGate(): Promise<void> {
+  try {
+    const onChainBps = await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: ORACLE_ABI,
+      functionName: 'deviationThresholdBps',
+    })
+    DEVIATION_GATE_BPS = BigInt(onChainBps)
+    console.log(`[BEACON] Deviation gate:   ${DEVIATION_GATE_BPS}bps (${Number(DEVIATION_GATE_BPS) / 100}%) -- read from chain`)
+  } catch (e) {
+    console.warn(`[BEACON] Could not read deviationThresholdBps from chain, using fallback ${DEVIATION_GATE_BPS}bps: ${safeMsg(e)}`)
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Entry
 // ---------------------------------------------------------------------------
 
@@ -637,14 +684,14 @@ console.log('[BEACON] Reporter starting')
 console.log(`[BEACON] Contract:         ${CONTRACT_ADDRESS}`)
 console.log(`[BEACON] Reporter wallet:  ${REPORTER_WALLET_ID}`)
 console.log(`[BEACON] Cycle:            every ${CYCLE_INTERVAL_MS / 1000}s`)
-console.log(`[BEACON] Deviation gate:   ${DEVIATION_GATE_BPS}bps (${Number(DEVIATION_GATE_BPS) / 100}%)`)
+console.log(`[BEACON] Deviation gate:   reading from chain at startup...`)
 console.log(`[BEACON] Heartbeat:        ${HEARTBEAT_SECS}s (${HEARTBEAT_SECS / 3600}h)`)
 console.log(`[BEACON] Quorum:           USDC/USD ${USDC_USD_QUORUM}/5 | NGN/USD ${NGN_USDT_QUORUM}/3`)
 console.log(`[BEACON] Outlier filter:   10% max deviation from group median`)
 console.log('')
 
 if (missingVars.length === 0) {
-  void loop()
+  void initDeviationGate().then(() => loop())
 } else {
   console.error('[BEACON] Reporter loop NOT started due to missing env vars above.')
   console.error('[BEACON] Fix secrets on Fly.io and redeploy. Health server remains running.')
