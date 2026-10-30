@@ -121,73 +121,6 @@ beacon-oracle/
   ENV.example               # All required environment variables documented
 ```
 
----
-
-## Quick Start
-
-### 1. Install dependencies
-
-```bash
-bun install
-```
-
-### 2. Configure environment
-
-Copy `ENV.example` and fill in your values:
-
-```bash
-cp ENV.example .env
-# Edit .env with your credentials
-```
-
-See `ENV.example` for all required variables. See `GUIDE.md` for how to obtain each one.
-
-### 3. Run the frontend
-
-```bash
-bun run dev
-```
-
-Open http://localhost:5173
-
-### 4. Set up the reporter wallet (once)
-
-Add `CIRCLE_API_KEY` and `CIRCLE_ENTITY_SECRET` to `.env`, then:
-
-```bash
-bun run scripts/setup-reporter-wallet.ts
-```
-
-This creates a Circle developer-controlled wallet, prints the wallet ID and address, and tells you what to do next (fund it, call `setReporter()`, start the loop).
-
-### 5. Start the reporter
-
-```bash
-bun run scripts/reporter.ts
-```
-
-The reporter fetches prices from external sources, derives the USDC/NGN rate, checks deviation against the on-chain value, and calls `transmit()` via a Circle developer-controlled wallet every ~60 seconds.
-
----
-
-## Deployment
-
-### Frontend (Vercel)
-
-Connect the `beacon-oracle` repo to Vercel. Add these environment variables:
-
-| Variable | Value |
-|---|---|
-| `VITE_ORACLE_CONTRACT_ADDRESS` | `0xe0e4894106B1e517752515D40601ec890262e0ea` |
-| `VITE_REPORTER_STATUS_URL` | `https://beacon-oracle.fly.dev/status` |
-
-Framework preset: **Vite**.
-
-### Reporter (Railway / Render / VPS)
-
-The reporter is a long-running process and cannot run on Vercel. Deploy it as a background worker on Railway, Render, Fly.io, or any Linux server. Set all variables from `ENV.example` in that environment.
-
----
 
 ## Contract Integration
 
@@ -221,17 +154,6 @@ contract MyContract {
 }
 ```
 
----
-
-## Upgrading the Contract
-
-BEACON uses UUPS proxy pattern. To deploy a new implementation:
-
-1. Write and deploy the new implementation contract
-2. Call `upgradeToAndCall(newImplementation, "")` from the owner wallet
-3. The proxy address stays the same -- all consumers are unaffected
-
----
 
 ## License
 
