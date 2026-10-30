@@ -125,9 +125,9 @@ export function QuoteCalculator() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <span style={{ fontSize: 12, color: 'var(--subtle)', fontWeight: 500 }}>From</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 999, padding: '6px 14px 6px 6px' }}>
-            {direction === 'usdc-to-ngn' ? <USDCIcon size={40} /> : <NGNIcon size={40} />}
-            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{fromCurrency}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 999, padding: '4px 10px 4px 4px' }}>
+            {direction === 'usdc-to-ngn' ? <USDCIcon size={26} /> : <NGNIcon size={26} />}
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{fromCurrency}</span>
           </div>
         </div>
         <input
@@ -171,9 +171,9 @@ export function QuoteCalculator() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <span style={{ fontSize: 12, color: 'var(--subtle)', fontWeight: 500 }}>To</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 999, padding: '6px 14px 6px 6px' }}>
-            {direction === 'usdc-to-ngn' ? <NGNIcon size={40} /> : <USDCIcon size={40} />}
-            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{toCurrency}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 999, padding: '4px 10px 4px 4px' }}>
+            {direction === 'usdc-to-ngn' ? <NGNIcon size={26} /> : <USDCIcon size={26} />}
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{toCurrency}</span>
           </div>
         </div>
         <div style={{
