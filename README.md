@@ -155,6 +155,13 @@ contract MyContract {
 ```
 
 
+## Links
+
+- [Live App](https://beacon-oracle.vercel.app)
+- [Documentation](https://beacon-oracle.vercel.app/#/docs)
+- [ArcScan Explorer](https://explorer.arc.io/address/0xe0e4894106B1e517752515D40601ec890262e0ea)
+- [Twitter / X](https://x.com/Elijah463_)
+
 ## License
 
 MIT

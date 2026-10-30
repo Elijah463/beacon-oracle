@@ -10,6 +10,147 @@ import { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Copy, Check, ExternalLink } from 'lucide-react'
 import { BeaconMark } from './BeaconLogo'
 
+// ── Architecture flow diagram (docs) ───────────────────────────────────────
+const ARCH_STEPS = [
+  {
+    icon: '◎',
+    col: '#60a5fa',
+    label: 'Market Sources',
+    sub: '8 independent price feeds',
+    detail: 'Five CEX spot markets supply USDC/USD. Three independent APIs supply USD/NGN rates. All sources are fetched in parallel every 30 seconds.',
+  },
+  {
+    icon: '⬡',
+    col: '#a78bfa',
+    label: 'Aggregator',
+    sub: 'Median + outlier filter',
+    detail: 'Each price leg is median-aggregated independently. A 10% outlier filter removes any source that deviates too far from the group. A minimum quorum of 2 sources per leg is required before aggregation proceeds.',
+  },
+  {
+    icon: '⬢',
+    col: '#f472b6',
+    label: 'ECDSA Signer',
+    sub: 'Signing key verification',
+    detail: 'The reporter signs keccak256(contractAddress, answer, timestamp, nextRoundId) with a dedicated private key. The contract verifies this signature on-chain -- no trusted submitter address required.',
+  },
+  {
+    icon: '◈',
+    col: '#00D66F',
+    label: 'BEACON Contract',
+    sub: 'On-chain round storage',
+    detail: 'transmit() verifies the ECDSA signature, enforces monotonic timestamps, checks the deviation circuit breaker, and writes the round into a 100-slot circular buffer. Any contract can read via AggregatorV3Interface.',
+  },
+]
+
+const EDGE_LABELS = ['price data', 'signed payload', 'transmit()']
+
+function hexToRgbDocs(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `${r},${g},${b}`
+}
+
+function ArchFlowDiagram() {
+  const [active, setActive] = useState<number | null>(null)
+  const [animStep, setAnimStep] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(() => setAnimStep(s => (s + 1) % (ARCH_STEPS.length + 1)), 1200)
+    return () => clearInterval(id)
+  }, [])
+
+  const displayed = active !== null ? active : animStep % ARCH_STEPS.length
+
+  return (
+    <div style={{ width: '100%' }}>
+      <style>{`
+        @keyframes archSlideRight { from { left: 0; } to { left: 100%; } }
+        .arch-docs-flow { display: flex; align-items: flex-start; justify-content: center; gap: 0; flex-wrap: wrap; }
+        .arch-docs-node { width: 130px; cursor: pointer; }
+        @media (max-width: 600px) {
+          .arch-docs-flow { flex-direction: column; align-items: center; }
+          .arch-docs-node { width: 80vw; max-width: 300px; }
+          .arch-docs-connector { flex-direction: row !important; width: auto !important; height: 36px !important; }
+          .arch-docs-connector-line { width: 2px !important; height: 100% !important; }
+        }
+      `}</style>
+
+      {/* Step nodes */}
+      <div className="arch-docs-flow">
+        {ARCH_STEPS.map((node, i) => (
+          <div key={node.label} style={{ display: 'contents' }}>
+            <div
+              className="arch-docs-node"
+              onClick={() => setActive(active === i ? null : i)}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                gap: 8, padding: '16px 12px',
+                background: animStep > i || active === i
+                  ? `linear-gradient(135deg, rgba(${hexToRgbDocs(node.col)},0.14), rgba(${hexToRgbDocs(node.col)},0.04))`
+                  : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${animStep > i || active === i ? node.col + '66' : 'rgba(255,255,255,0.07)'}`,
+                borderRadius: 14, transition: 'all 0.4s ease',
+                boxShadow: animStep > i || active === i ? `0 0 20px rgba(${hexToRgbDocs(node.col)},0.15)` : 'none',
+              }}
+            >
+              <span style={{ fontSize: 26, color: animStep > i || active === i ? node.col : '#334155', transition: 'color 0.4s' }}>{node.icon}</span>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: animStep > i || active === i ? '#f1f5f9' : '#475569', transition: 'color 0.4s', fontFamily: "'Space Grotesk', sans-serif" }}>
+                  {node.label}
+                </div>
+                <div style={{ fontSize: 10, color: animStep > i || active === i ? '#94a3b8' : '#334155', marginTop: 2, transition: 'color 0.4s' }}>
+                  {node.sub}
+                </div>
+              </div>
+              <div style={{ fontSize: 9, color: '#475569', marginTop: 2 }}>tap for details</div>
+            </div>
+
+            {i < ARCH_STEPS.length - 1 && (
+              <div className="arch-docs-connector" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 40, flexShrink: 0, paddingTop: 28 }}>
+                <div className="arch-docs-connector-line" style={{
+                  height: 2, width: '100%', position: 'relative',
+                  background: animStep > i
+                    ? `linear-gradient(90deg, ${ARCH_STEPS[i].col}, ${ARCH_STEPS[i + 1].col})`
+                    : 'rgba(255,255,255,0.08)',
+                  transition: 'background 0.4s',
+                }}>
+                  {animStep === i + 1 && (
+                    <div style={{
+                      position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+                      width: 7, height: 7, borderRadius: '50%',
+                      background: ARCH_STEPS[i].col, boxShadow: `0 0 7px ${ARCH_STEPS[i].col}`,
+                      animation: 'archSlideRight 1.2s linear',
+                    }} />
+                  )}
+                </div>
+                <div style={{ fontSize: 9, color: '#334155', marginTop: 3, textAlign: 'center' }}>
+                  {animStep > i ? EDGE_LABELS[i] : ''}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Detail panel for selected or auto-highlighted node */}
+      <div style={{
+        marginTop: 16, padding: '14px 18px',
+        background: `rgba(${hexToRgbDocs(ARCH_STEPS[displayed].col)},0.07)`,
+        border: `1px solid ${ARCH_STEPS[displayed].col}44`,
+        borderRadius: 12, transition: 'all 0.3s ease',
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: ARCH_STEPS[displayed].col, marginBottom: 6, fontFamily: "'Space Grotesk', sans-serif" }}>
+          {ARCH_STEPS[displayed].icon} {ARCH_STEPS[displayed].label}
+        </div>
+        <div style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.6 }}>
+          {ARCH_STEPS[displayed].detail}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const CONTRACT = '0xe0e4894106B1e517752515D40601ec890262e0ea'
 const EXPLORER = `https://explorer.arc.io/address/${CONTRACT}`
 const CHAIN_ID  = 5042
@@ -170,6 +311,13 @@ RPC:      https://rpc.mainnet.arc.io`}</Code>
           BEACON is deployed on Arc Network. The proxy address above is permanent
           even after future upgrades. Always use the proxy address, never an implementation address.
         </Note>
+
+        <H3>Architecture flow</H3>
+
+        {/* Inline arch flow diagram */}
+        <div style={{ margin: '20px 0' }}>
+          <ArchFlowDiagram />
+        </div>
 
         <H3>How the price is derived</H3>
         <P>

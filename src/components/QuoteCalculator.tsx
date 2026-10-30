@@ -24,22 +24,12 @@ function formatUSDC(raw: bigint): string {
   return formatCompact(Number(raw) / 10 ** USDC_DECIMALS, 2)
 }
 
-// Simple SVG circle logos
-function USDCIcon({ size = 28 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-      <circle cx="16" cy="16" r="16" fill="#2775CA" />
-      <path d="M16 6C10.477 6 6 10.477 6 16s4.477 10 10 10 10-4.477 10-10S21.523 6 16 6zm1.2 15.6v1.4h-2.4v-1.4c-2.16-.44-3.6-1.96-3.6-3.96h2.4c0 1.04.84 1.8 2.04 1.8 1.12 0 1.96-.68 1.96-1.64 0-.88-.6-1.44-2.04-1.88-2.16-.64-3.56-1.56-3.56-3.44 0-1.72 1.28-3.04 2.8-3.4V7.4h2.4v1.48c1.96.36 3.2 1.72 3.2 3.52h-2.4c0-.96-.72-1.6-1.8-1.6-1.04 0-1.8.56-1.8 1.4 0 .8.56 1.32 2 1.76 2.2.64 3.6 1.6 3.6 3.6 0 1.8-1.32 3.16-2.8 3.56z" fill="white" />
-    </svg>
-  )
+// Real PNG logos from public/
+function USDCIcon({ size = 56 }: { size?: number }) {
+  return <img src="/USDC_Logo.png" alt="USDC" width={size} height={size} style={{ objectFit: 'contain', borderRadius: '50%' }} />
 }
-function NGNIcon({ size = 28 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-      <circle cx="16" cy="16" r="16" fill="#008751" />
-      <text x="16" y="21" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold" fontFamily="sans-serif">₦</text>
-    </svg>
-  )
+function NGNIcon({ size = 56 }: { size?: number }) {
+  return <img src="/NGN_Logo.png" alt="NGN" width={size} height={size} style={{ objectFit: 'contain', borderRadius: '50%' }} />
 }
 
 export function QuoteCalculator() {
@@ -135,9 +125,9 @@ export function QuoteCalculator() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <span style={{ fontSize: 12, color: 'var(--subtle)', fontWeight: 500 }}>From</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 999, padding: '4px 10px 4px 6px' }}>
-            {direction === 'usdc-to-ngn' ? <USDCIcon size={20} /> : <NGNIcon size={20} />}
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{fromCurrency}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 999, padding: '6px 14px 6px 6px' }}>
+            {direction === 'usdc-to-ngn' ? <USDCIcon size={40} /> : <NGNIcon size={40} />}
+            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{fromCurrency}</span>
           </div>
         </div>
         <input
@@ -181,9 +171,9 @@ export function QuoteCalculator() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <span style={{ fontSize: 12, color: 'var(--subtle)', fontWeight: 500 }}>To</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 999, padding: '4px 10px 4px 6px' }}>
-            {direction === 'usdc-to-ngn' ? <NGNIcon size={20} /> : <USDCIcon size={20} />}
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{toCurrency}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 999, padding: '6px 14px 6px 6px' }}>
+            {direction === 'usdc-to-ngn' ? <NGNIcon size={40} /> : <USDCIcon size={40} />}
+            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{toCurrency}</span>
           </div>
         </div>
         <div style={{

@@ -177,22 +177,39 @@ function ArchDiagram() {
   ]
 
   return (
-    <div style={{ width: '100%', overflowX: 'auto' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 0, minWidth: 640, padding: '24px 0',
-      }}>
+    <div style={{ width: '100%' }}>
+      {/* Desktop: horizontal row. Mobile: vertical stack -- each node fully visible, no cut-off */}
+      <style>{`
+        @keyframes slideRight { from { left: 0; } to { left: 100%; } }
+        @keyframes slideDown  { from { top: 0;  } to { top: 100%;  } }
+        .arch-flow {
+          display: flex; align-items: center; justify-content: center;
+          gap: 0; padding: 24px 0;
+        }
+        .arch-flow .arch-node { width: 140px; }
+        .arch-flow .arch-connector { display: flex; flex-direction: column; align-items: center; width: 48px; flex-shrink: 0; }
+        .arch-flow .arch-connector-line { height: 2px; width: 100%; position: relative; }
+        .arch-flow .arch-connector-label { font-size: 10px; color: #334155; margin-top: 4px; }
+        @media (max-width: 600px) {
+          .arch-flow { flex-direction: column; align-items: center; padding: 16px 0; gap: 0; }
+          .arch-flow .arch-node { width: 80vw; max-width: 300px; }
+          .arch-flow .arch-connector { flex-direction: row; width: auto; height: 44px; align-items: center; justify-content: center; gap: 8px; }
+          .arch-flow .arch-connector-line { width: 2px; height: 100%; position: relative; }
+          .arch-flow .arch-connector-label { font-size: 10px; color: #334155; margin-top: 0; margin-left: 6px; }
+        }
+      `}</style>
+      <div className="arch-flow">
         {nodes.map((node, i) => (
-          <div key={node.label} style={{ display: 'flex', alignItems: 'center' }}>
+          <div key={node.label} style={{ display: 'contents' }}>
             {/* Node */}
-            <div style={{
+            <div className="arch-node" style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
               gap: 8, padding: '20px 24px',
               background: step >= i
                 ? `linear-gradient(135deg, rgba(${hexToRgb(node.col)},0.12), rgba(${hexToRgb(node.col)},0.04))`
                 : 'rgba(255,255,255,0.03)',
               border: `1px solid ${step >= i ? node.col + '55' : 'rgba(255,255,255,0.07)'}`,
-              borderRadius: 16, width: 140, transition: 'all 0.4s ease',
+              borderRadius: 16, transition: 'all 0.4s ease',
               boxShadow: step >= i ? `0 0 24px rgba(${hexToRgb(node.col)},0.15)` : 'none',
             }}>
               <span style={{ fontSize: 28, color: step >= i ? node.col : '#334155', transition: 'color 0.4s' }}>{node.icon}</span>
@@ -206,18 +223,15 @@ function ArchDiagram() {
               </div>
             </div>
 
-            {/* Arrow between nodes */}
+            {/* Connector between nodes */}
             {i < nodes.length - 1 && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 48, flexShrink: 0 }}>
-                <div style={{
-                  height: 2, width: '100%',
+              <div className="arch-connector">
+                <div className="arch-connector-line" style={{
                   background: step > i
                     ? `linear-gradient(90deg, ${nodes[i].col}, ${nodes[i + 1].col})`
                     : 'rgba(255,255,255,0.08)',
                   transition: 'background 0.4s',
-                  position: 'relative',
                 }}>
-                  {/* Moving dot on active edge */}
                   {step === i + 1 && (
                     <div style={{
                       position: 'absolute', top: '50%', transform: 'translateY(-50%)',
@@ -227,7 +241,7 @@ function ArchDiagram() {
                     }} />
                   )}
                 </div>
-                <div style={{ fontSize: 10, color: '#334155', marginTop: 4 }}>
+                <div className="arch-connector-label">
                   {step > i ? ['price data', 'signed payload', 'transmit()'][i] : ''}
                 </div>
               </div>
@@ -235,12 +249,6 @@ function ArchDiagram() {
           </div>
         ))}
       </div>
-      <style>{`
-        @keyframes slideRight {
-          from { left: 0; }
-          to   { left: 100%; }
-        }
-      `}</style>
     </div>
   )
 }

@@ -715,3 +715,12 @@
 {"level":"debug","message":"[vite] hot updated: /src/components/QuoteCalculator.tsx","timestamp":1793351816640}
 {"level":"debug","message":"(previous line repeated 1× more)","timestamp":1793351817969}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793351817969}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793357548601}
+{"level":"debug","message":"[vite] hot updated: /src/components/QuoteCalculator.tsx","timestamp":1793402259457}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793402259458}
+{"level":"debug","message":"[vite] hot updated: /src/components/LandingPage.tsx","timestamp":1793402275960}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793402275960}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793402282592}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793402282593}
+{"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793402301514}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793402301515}

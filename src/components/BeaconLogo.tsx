@@ -1,8 +1,7 @@
 /**
  * BeaconLogo.tsx
- * Faithful SVG reproduction of the BEACON radial-burst logo.
- * 20 rounded teardrop spokes radiating from a shared center, brand color #00D66F.
- * Use BeaconLogo for full lockup (icon + wordmark), BeaconMark for icon only.
+ * Uses the real Beacon_Logo.png uploaded to public/.
+ * BeaconMark = icon only, BeaconLogo = icon + wordmark.
  */
 
 interface LogoProps {
@@ -10,26 +9,17 @@ interface LogoProps {
   className?: string
 }
 
-/** Icon-only mark -- 20-spoke radial burst */
+/** Icon-only mark -- real PNG logo */
 export function BeaconMark({ size = 40, className = '' }: LogoProps) {
-  const spokes = Array.from({ length: 20 }, (_, i) => i)
   return (
-    <svg
+    <img
+      src="/Beacon_Logo.png"
+      alt="BEACON"
       width={size}
       height={size}
-      viewBox="0 0 100 100"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
       className={className}
-      aria-label="BEACON logo"
-    >
-      {spokes.map((i) => (
-        <g key={i} transform={`rotate(${i * 18} 50 50)`}>
-          {/* Each spoke: a thin rounded rectangle tapering to a circle tip */}
-          <rect x="47.5" y="8" width="5" height="22" rx="2.5" fill="#00D66F" />
-        </g>
-      ))}
-    </svg>
+      style={{ objectFit: 'contain', display: 'block' }}
+    />
   )
 }
 
