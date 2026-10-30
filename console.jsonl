@@ -724,3 +724,4 @@
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793402282593}
 {"level":"debug","message":"[vite] hot updated: /src/components/DocsPage.tsx","timestamp":1793402301514}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793402301515}
+{"level":"error","message":"[vite] Failed to reload /src/components/LandingPage.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)","timestamp":1793402548266}

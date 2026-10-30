@@ -177,26 +177,18 @@ function ArchDiagram() {
   ]
 
   return (
-    <div style={{ width: '100%' }}>
-      {/* Desktop: horizontal row. Mobile: vertical stack -- each node fully visible, no cut-off */}
+    <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <style>{`
         @keyframes slideRight { from { left: 0; } to { left: 100%; } }
-        @keyframes slideDown  { from { top: 0;  } to { top: 100%;  } }
         .arch-flow {
-          display: flex; align-items: center; justify-content: center;
-          gap: 0; padding: 24px 0;
+          display: flex; align-items: center; justify-content: flex-start;
+          gap: 0; padding: 24px 16px;
+          width: max-content; min-width: 100%;
         }
-        .arch-flow .arch-node { width: 140px; }
+        .arch-flow .arch-node { width: 140px; flex-shrink: 0; }
         .arch-flow .arch-connector { display: flex; flex-direction: column; align-items: center; width: 48px; flex-shrink: 0; }
         .arch-flow .arch-connector-line { height: 2px; width: 100%; position: relative; }
         .arch-flow .arch-connector-label { font-size: 10px; color: #334155; margin-top: 4px; }
-        @media (max-width: 600px) {
-          .arch-flow { flex-direction: column; align-items: center; padding: 16px 0; gap: 0; }
-          .arch-flow .arch-node { width: 80vw; max-width: 300px; }
-          .arch-flow .arch-connector { flex-direction: row; width: auto; height: 44px; align-items: center; justify-content: center; gap: 8px; }
-          .arch-flow .arch-connector-line { width: 2px; height: 100%; position: relative; }
-          .arch-flow .arch-connector-label { font-size: 10px; color: #334155; margin-top: 0; margin-left: 6px; }
-        }
       `}</style>
       <div className="arch-flow">
         {nodes.map((node, i) => (
