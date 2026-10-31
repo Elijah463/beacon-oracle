@@ -1,11 +1,11 @@
 /**
- * PriceChart.tsx
- * Canvas-based USDC/NGN price chart.
- * - Y-axis: 0, 1000, 1200, 1400, 1600, then actual price
- * - Line animates drawing left-to-right from zero on mount
- * - No X-axis labels -- hover/tap shows a tooltip that fades after 10s
- * - Brand-green gradient fill directly under the line
- * - No Recharts -- pure canvas for full control
+ * PriceChart.tsx -- clean canvas price chart
+ * - X axis: proportional to real time (no fake equal spacing)
+ * - Y axis: exactly 5 ticks, minimum 0.5% spread, 2 decimal labels
+ * - Smooth monotone cubic spline (no wild bezier overshoots)
+ * - Gradient fill under line
+ * - Tap/hover tooltip fades after 10s
+ * - Animates draw-on from left to right
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react'
@@ -16,86 +16,91 @@ interface PriceChartProps {
   price:   number | null
   loading: boolean
 }
+interface TooltipState { price: number; time: string; x: number; y: number; opacity: number }
 
-interface TooltipState {
-  price:     number
-  time:      string
-  x:         number
-  y:         number
-  visible:   boolean
-  opacity:   number
-}
+const BRAND  = '#00D66F'
+const PAD_L  = 62   // room for "1,620.50" labels
+const PAD_R  = 12
+const PAD_T  = 14
+const PAD_B  = 14
+const H_CHART = 220
 
-const BRAND   = '#00D66F'
-const PAD_L   = 56   // left padding for Y-axis labels
-const PAD_R   = 12
-const PAD_T   = 16
-const PAD_B   = 12
+// ── Y-axis builder: exactly 5 evenly-spaced ticks ──────────────────────────
+function buildYAxis(minP: number, maxP: number) {
+  const mid    = (minP + maxP) / 2
+  // Enforce minimum 0.5% visible spread
+  const spread = Math.max(maxP - minP, mid * 0.005)
 
-/**
- * Build a fully dynamic Y-axis.
- * Strategy:
- *   - yMin = floor of (minPrice - small pad) snapped to step
- *   - yMax = ceil  of (maxPrice + small pad) snapped to step
- *   - step = nice round number that gives 5-8 ticks across the range
- *   - Always include 0 as the chart baseline (line draws from zero)
- *     but the visible labels start from yMin so the detail is tight.
- */
-function buildYAxis(minPrice: number, maxPrice: number): { ticks: number[]; yMin: number; yMax: number } {
-  const range = maxPrice - minPrice
-
-  // Enforce a minimum visible spread of 0.5% of the price so ticks always
-  // span the full chart height even when all rounds are nearly identical.
-  // This prevents the degenerate case of 6 ticks crammed into 3 pixels.
-  const minSpread = maxPrice * 0.005
-  const spread = Math.max(range, minSpread)
-
-  // Pick a step that gives exactly 4 intervals = 5 ticks
-  const rawStep = spread / 4
-  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)))
-  const niceStep = (() => {
-    const ratio = rawStep / magnitude
-    if (ratio < 1.5) return magnitude
-    if (ratio < 3.5) return 2 * magnitude
-    if (ratio < 7.5) return 5 * magnitude
-    return 10 * magnitude
+  // Nice step for 4 intervals
+  const rawStep   = spread / 4
+  const mag       = Math.pow(10, Math.floor(Math.log10(rawStep)))
+  const niceStep  = (() => {
+    const r = rawStep / mag
+    if (r < 1.5) return mag
+    if (r < 3.5) return 2 * mag
+    if (r < 7.5) return 5 * mag
+    return 10 * mag
   })()
 
-  const midPrice = (minPrice + maxPrice) / 2
-  // Center the axis around the midpoint of actual prices
-  const yMin = Math.max(0, Math.floor((midPrice - spread * 0.6) / niceStep) * niceStep)
-  const yMax = Math.ceil((midPrice + spread * 0.6) / niceStep) * niceStep
+  // Snap min/max to step, centered on mid
+  const yMin = Math.max(0, Math.floor((mid - spread * 0.65) / niceStep) * niceStep)
+  const yMax = Math.ceil((mid + spread * 0.65) / niceStep) * niceStep
 
-  const ticks: number[] = []
-  for (let t = yMin; t <= yMax + niceStep * 0.01; t += niceStep) {
-    ticks.push(Math.round(t))
-  }
-  // Always ensure yMax tick exists
-  if (ticks[ticks.length - 1] < yMax) ticks.push(Math.round(yMax))
+  // Exactly 5 ticks evenly spaced between yMin and yMax
+  const ticks = Array.from({ length: 5 }, (_, i) => yMin + (i / 4) * (yMax - yMin))
 
-  // Hard cap: never show more than 5 ticks -- thin out evenly if over
-  const MAX_TICKS = 5
-  const final = ticks.length <= MAX_TICKS
-    ? ticks
-    : Array.from({ length: MAX_TICKS }, (_, i) =>
-        ticks[Math.round(i * (ticks.length - 1) / (MAX_TICKS - 1))]
-      )
-
-  return { ticks: final, yMin, yMax }
+  return { ticks, yMin, yMax }
 }
 
-function toCanvasY(val: number, yMin: number, yMax: number, h: number): number {
+// ── Coordinate helpers ──────────────────────────────────────────────────────
+function toY(val: number, yMin: number, yMax: number, h: number) {
   return PAD_T + (1 - (val - yMin) / (yMax - yMin)) * (h - PAD_T - PAD_B)
 }
+function toX(ts: number, tsMin: number, tsMax: number, w: number) {
+  if (tsMin === tsMax) return PAD_L + (w - PAD_L - PAD_R) / 2
+  return PAD_L + ((ts - tsMin) / (tsMax - tsMin)) * (w - PAD_L - PAD_R)
+}
 
-function toCanvasX(idx: number, total: number, w: number): number {
-  if (total <= 1) return PAD_L + (w - PAD_L - PAD_R) / 2
-  return PAD_L + (idx / (total - 1)) * (w - PAD_L - PAD_R)
+// ── Monotone cubic spline (Fritsch-Carlson) prevents overshoots ─────────────
+function buildSpline(pts: {x: number; y: number}[]): {x: number; y: number; cp1x: number; cp1y: number; cp2x: number; cp2y: number}[] {
+  const n = pts.length
+  if (n < 2) return []
+  const dx = pts.slice(1).map((p, i) => p.x - pts[i].x)
+  const dy = pts.slice(1).map((p, i) => p.y - pts[i].y)
+  const m  = dx.map((d, i) => d === 0 ? 0 : dy[i] / d)
+
+  // Tangents
+  const t = Array(n).fill(0)
+  t[0] = m[0]; t[n - 1] = m[n - 2]
+  for (let i = 1; i < n - 1; i++) t[i] = (m[i - 1] + m[i]) / 2
+
+  // Monotonicity constraint
+  for (let i = 0; i < n - 1; i++) {
+    if (m[i] === 0) { t[i] = t[i + 1] = 0; continue }
+    const a = t[i] / m[i], b = t[i + 1] / m[i]
+    if (a < 0 || b < 0) { t[i] = t[i + 1] = 0; continue }
+    if (a * a + b * b > 9) {
+      const s = 3 / Math.sqrt(a * a + b * b)
+      t[i] *= s * a; t[i + 1] *= s * b
+    }
+  }
+
+  return pts.slice(0, -1).map((p, i) => ({
+    x: pts[i + 1].x, y: pts[i + 1].y,
+    cp1x: p.x + dx[i] / 3,       cp1y: p.y + t[i] * dx[i] / 3,
+    cp2x: pts[i + 1].x - dx[i] / 3, cp2y: pts[i + 1].y - t[i + 1] * dx[i] / 3,
+  }))
+}
+
+// ── Label formatter ─────────────────────────────────────────────────────────
+function fmtY(v: number) {
+  // Show enough decimals to distinguish ticks -- use 2 for NGN prices ~1600
+  return v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 }
 
 export function PriceChart({ history, price: _price, loading }: PriceChartProps) {
   const canvasRef   = useRef<HTMLCanvasElement>(null)
-  const progressRef = useRef(0)      // 0..1 draw progress
+  const progressRef = useRef(0)
   const rafRef      = useRef<number>(0)
   const timerRef    = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fadeRef     = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -106,129 +111,98 @@ export function PriceChart({ history, price: _price, loading }: PriceChartProps)
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    // Use offsetWidth/offsetHeight (CSS pixels) -- these are always correct
-    // regardless of whether the resize effect has run yet. canvas.width/dpr
-    // can be stale (HTML default 300px) on the first animate frame.
-    const w = canvas.offsetWidth  || canvas.width  / (window.devicePixelRatio || 1)
-    const h = canvas.offsetHeight || canvas.height / (window.devicePixelRatio || 1)
-    if (w < 10 || h < 10) return  // not yet mounted / zero-size
+
+    const w = canvas.offsetWidth  || 400
+    const h = canvas.offsetHeight || H_CHART
+    if (w < 10 || h < 10) return
 
     ctx.clearRect(0, 0, w, h)
-
     if (history.length < 2) return
 
-    const prices  = history.map(r => r.price)
-    const minP    = Math.min(...prices)
-    const maxP    = Math.max(...prices)
-    const { ticks: yTicks, yMin, yMax } = buildYAxis(minP, maxP)
+    const prices = history.map(r => r.price)
+    const times  = history.map(r => r.updatedAt)
+    const minP   = Math.min(...prices), maxP = Math.max(...prices)
+    const minT   = Math.min(...times),  maxT = Math.max(...times)
+    const { ticks, yMin, yMax } = buildYAxis(minP, maxP)
 
-    // ── Y-axis grid lines + labels ──────────────────────────────────────
-    ctx.font = `600 10px system-ui, sans-serif`
+    // ── Y-axis labels + gridlines ─────────────────────────────────────────
+    ctx.font      = '11px system-ui, sans-serif'
     ctx.textAlign = 'right'
-    for (const tick of yTicks) {
-      if (tick === yMin && yMin === 0) continue   // skip zero label when baseline is 0
-      const cy = toCanvasY(tick, yMin, yMax, h)
-      // gridline
-      ctx.beginPath()
-      ctx.strokeStyle = 'rgba(255,255,255,0.05)'
+    ctx.textBaseline = 'middle'
+    for (const tick of ticks) {
+      const cy = toY(tick, yMin, yMax, h)
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)'
       ctx.lineWidth   = 1
-      ctx.moveTo(PAD_L, cy)
-      ctx.lineTo(w - PAD_R, cy)
-      ctx.stroke()
-      // label
-      ctx.fillStyle = 'rgba(100,116,139,0.9)'
-      ctx.fillText(
-        tick.toLocaleString('en-US', { maximumFractionDigits: 0 }),
-        PAD_L - 6,
-        cy + 4,
-      )
+      ctx.beginPath(); ctx.moveTo(PAD_L, cy); ctx.lineTo(w - PAD_R, cy); ctx.stroke()
+      ctx.fillStyle = 'rgba(148,163,184,0.85)'
+      ctx.fillText(fmtY(tick), PAD_L - 6, cy)
     }
 
-    // ── Build point list, animated by progress ──────────────────────────
-    const total  = history.length
-    // How many full segments to draw: progress * (total-1) segments
-    const segMax = progress * (total - 1)
-    const points: Array<{ cx: number; cy: number }> = []
+    // ── Clip how many points to draw based on progress ────────────────────
+    const visibleCount = Math.max(2, Math.ceil(progress * history.length))
+    const visible = history.slice(0, visibleCount)
+    const pts = visible.map(r => ({
+      x: toX(r.updatedAt, minT, maxT, w),
+      y: toY(r.price, yMin, yMax, h),
+    }))
 
-    for (let i = 0; i <= total - 1; i++) {
-      if (i > segMax) break
-      points.push({
-        cx: toCanvasX(i, total, w),
-        cy: toCanvasY(history[i].price, yMin, yMax, h),
-      })
-    }
+    const spline = buildSpline(pts)
+    const lastPt = pts[pts.length - 1]
+    const baseY  = toY(yMin, yMin, yMax, h)
 
-    // Partial last segment
-    const fullSegs  = Math.floor(segMax)
-    if (fullSegs < total - 1) {
-      const frac = segMax - fullSegs
-      const a    = points[points.length - 1] ?? { cx: PAD_L, cy: toCanvasY(0, yMin, yMax, h) }
-      const bx   = toCanvasX(fullSegs + 1, total, w)
-      const by   = toCanvasY(history[fullSegs + 1].price, yMin, yMax, h)
-      points.push({ cx: a.cx + (bx - a.cx) * frac, cy: a.cy + (by - a.cy) * frac })
-    }
-
-    if (points.length < 2) return
-
-    const lastPt = points[points.length - 1]
-    const baseY  = toCanvasY(yMin, yMin, yMax, h)
-
-    // ── Gradient fill ───────────────────────────────────────────────────
+    // ── Gradient fill ─────────────────────────────────────────────────────
     const grad = ctx.createLinearGradient(0, PAD_T, 0, baseY)
-    grad.addColorStop(0,   'rgba(0,214,111,0.30)')
-    grad.addColorStop(0.6, 'rgba(0,214,111,0.08)')
+    grad.addColorStop(0,   'rgba(0,214,111,0.22)')
+    grad.addColorStop(0.7, 'rgba(0,214,111,0.06)')
     grad.addColorStop(1,   'rgba(0,214,111,0.00)')
 
     ctx.beginPath()
-    ctx.moveTo(points[0].cx, baseY)
-    ctx.lineTo(points[0].cx, points[0].cy)
-    for (let i = 1; i < points.length; i++) {
-      const prev = points[i - 1]
-      const curr = points[i]
-      const cpx  = (prev.cx + curr.cx) / 2
-      ctx.bezierCurveTo(cpx, prev.cy, cpx, curr.cy, curr.cx, curr.cy)
+    ctx.moveTo(pts[0].x, baseY)
+    ctx.lineTo(pts[0].x, pts[0].y)
+    if (spline.length > 0) {
+      for (const s of spline) ctx.bezierCurveTo(s.cp1x, s.cp1y, s.cp2x, s.cp2y, s.x, s.y)
+    } else {
+      ctx.lineTo(lastPt.x, lastPt.y)
     }
-    ctx.lineTo(lastPt.cx, baseY)
+    ctx.lineTo(lastPt.x, baseY)
     ctx.closePath()
     ctx.fillStyle = grad
     ctx.fill()
 
-    // ── Line ────────────────────────────────────────────────────────────
+    // ── Line ─────────────────────────────────────────────────────────────
     ctx.beginPath()
-    ctx.moveTo(points[0].cx, points[0].cy)
-    for (let i = 1; i < points.length; i++) {
-      const prev = points[i - 1]
-      const curr = points[i]
-      const cpx  = (prev.cx + curr.cx) / 2
-      ctx.bezierCurveTo(cpx, prev.cy, cpx, curr.cy, curr.cx, curr.cy)
+    ctx.moveTo(pts[0].x, pts[0].y)
+    if (spline.length > 0) {
+      for (const s of spline) ctx.bezierCurveTo(s.cp1x, s.cp1y, s.cp2x, s.cp2y, s.x, s.y)
+    } else {
+      ctx.lineTo(lastPt.x, lastPt.y)
     }
     ctx.strokeStyle = BRAND
-    ctx.lineWidth   = 2.5
+    ctx.lineWidth   = 2
     ctx.lineJoin    = 'round'
+    ctx.lineCap     = 'round'
     ctx.stroke()
 
-    // ── Tip dot ─────────────────────────────────────────────────────────
+    // ── Tip dot ──────────────────────────────────────────────────────────
     if (progress >= 1) {
       ctx.beginPath()
-      ctx.arc(lastPt.cx, lastPt.cy, 4, 0, Math.PI * 2)
+      ctx.arc(lastPt.x, lastPt.y, 3.5, 0, Math.PI * 2)
       ctx.fillStyle   = BRAND
       ctx.shadowColor = BRAND
-      ctx.shadowBlur  = 8
+      ctx.shadowBlur  = 10
       ctx.fill()
       ctx.shadowBlur  = 0
     }
   }, [history])
 
-  // Animate draw-on
+  // ── Animate on new history ──────────────────────────────────────────────
   useEffect(() => {
     if (history.length < 2) return
     progressRef.current = 0
-    const start = performance.now()
-    const duration = Math.min(1200 + history.length * 80, 2400)
-
+    const start    = performance.now()
+    const duration = Math.min(1000 + history.length * 60, 2000)
     const step = (now: number) => {
       const t = Math.min((now - start) / duration, 1)
-      // Ease out cubic
       progressRef.current = 1 - Math.pow(1 - t, 3)
       draw(progressRef.current)
       if (t < 1) rafRef.current = requestAnimationFrame(step)
@@ -237,143 +211,108 @@ export function PriceChart({ history, price: _price, loading }: PriceChartProps)
     return () => cancelAnimationFrame(rafRef.current)
   }, [history, draw])
 
-  // Resize -- reset transform before scaling to prevent accumulation
+  // ── Resize ───────────────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const setSize = () => {
       const dpr = window.devicePixelRatio || 1
-      const w   = canvas.offsetWidth
-      const h   = canvas.offsetHeight
-      if (w === 0 || h === 0) return
-      canvas.width  = w * dpr
-      canvas.height = h * dpr
+      const cw  = canvas.offsetWidth
+      const ch  = canvas.offsetHeight
+      if (cw === 0 || ch === 0) return
+      canvas.width  = cw * dpr
+      canvas.height = ch * dpr
       const ctx = canvas.getContext('2d')
-      if (ctx) {
-        ctx.setTransform(1, 0, 0, 1, 0, 0)  // reset before scaling
-        ctx.scale(dpr, dpr)
-      }
+      if (ctx) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.scale(dpr, dpr) }
       draw(progressRef.current)
     }
-    setSize()   // set initial size immediately
+    setSize()
     const obs = new ResizeObserver(setSize)
     obs.observe(canvas)
     return () => obs.disconnect()
   }, [draw])
 
-  // Hit-test on hover/touch
-  const handlePointer = useCallback((clientX: number, _clientY: number) => {
+  // ── Tooltip hit-test ─────────────────────────────────────────────────────
+  const handlePointer = useCallback((clientX: number) => {
     if (history.length < 2) return
     const canvas = canvasRef.current
     if (!canvas) return
-    const rect  = canvas.getBoundingClientRect()
-    const mx    = clientX - rect.left
-    const w     = rect.width
-    const h     = rect.height
-    const prices = history.map(r => r.price)
-    const minP   = Math.min(...prices)
-    const maxP   = Math.max(...prices)
-    const { yMin, yMax } = buildYAxis(minP, maxP)
+    const rect = canvas.getBoundingClientRect()
+    const mx   = clientX - rect.left
+    const w    = rect.width
+    const times = history.map(r => r.updatedAt)
+    const minT  = Math.min(...times), maxT = Math.max(...times)
 
-    // Find closest point
     let best = 0, bestDist = Infinity
     for (let i = 0; i < history.length; i++) {
-      const cx = toCanvasX(i, history.length, w)
+      const cx = toX(history[i].updatedAt, minT, maxT, w)
       const d  = Math.abs(cx - mx)
       if (d < bestDist) { bestDist = d; best = i }
     }
+    const pt  = history[best]
+    const prices = history.map(r => r.price)
+    const { yMin, yMax } = buildYAxis(Math.min(...prices), Math.max(...prices))
+    const cx = toX(pt.updatedAt, minT, maxT, w)
+    const cy = toY(pt.price, yMin, yMax, rect.height)
 
-    const pt = history[best]
-    const cx = toCanvasX(best, history.length, w)
-    const cy = toCanvasY(pt.price, yMin, yMax, h)
-
-    // Clear existing fade timer
     if (timerRef.current) clearTimeout(timerRef.current)
     if (fadeRef.current)  clearInterval(fadeRef.current)
 
-    setTooltip({
-      price:   pt.price,
-      time:    new Date(pt.updatedAt * 1000).toLocaleTimeString(),
-      x:       cx,
-      y:       cy,
-      visible: true,
-      opacity: 1,
-    })
+    setTooltip({ price: pt.price, time: new Date(pt.updatedAt * 1000).toLocaleTimeString(), x: cx, y: cy, opacity: 1 })
 
-    // Auto-fade after 10s
     timerRef.current = setTimeout(() => {
       let op = 1
       fadeRef.current = setInterval(() => {
         op -= 0.05
-        if (op <= 0) {
-          clearInterval(fadeRef.current!)
-          setTooltip(null)
-        } else {
-          setTooltip(prev => prev ? { ...prev, opacity: op } : null)
-        }
+        if (op <= 0) { clearInterval(fadeRef.current!); setTooltip(null) }
+        else setTooltip(prev => prev ? { ...prev, opacity: op } : null)
       }, 40)
     }, 10000)
   }, [history])
 
-  const onMouseMove  = (e: React.MouseEvent)  => handlePointer(e.clientX, e.clientY)
-  const onTouchStart = (e: React.TouchEvent)  => {
-    e.preventDefault()
-    handlePointer(e.touches[0].clientX, e.touches[0].clientY)
-  }
+  if (loading) return (
+    <div style={{ borderRadius: 18, padding: 24, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+      <div style={{ height: 16, width: 140, background: 'var(--bg-muted)', borderRadius: 6, marginBottom: 16, animation: 'shimmer 1.5s infinite' }} />
+      <div style={{ height: H_CHART, background: 'var(--bg-muted)', borderRadius: 10, animation: 'shimmer 1.5s infinite' }} />
+    </div>
+  )
 
-  if (loading) {
-    return (
-      <div style={{ borderRadius: 18, padding: 24, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-        <div style={{ height: 16, width: 140, background: 'var(--bg-muted)', borderRadius: 6, marginBottom: 16, animation: 'shimmer 1.5s infinite' }} />
-        <div style={{ height: 220, background: 'var(--bg-muted)', borderRadius: 10, animation: 'shimmer 1.5s infinite' }} />
+  if (history.length < 2) return (
+    <div style={{ borderRadius: 18, padding: 24, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+      <Header count={0} />
+      <div style={{ height: H_CHART, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+          <rect width="40" height="40" rx="10" fill="var(--bg-muted)" />
+          <path d="M8 28L15 20L22 23L32 13" stroke="var(--border-strong)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <circle cx="32" cy="13" r="2.5" fill="#00D66F" fillOpacity="0.5"/>
+        </svg>
+        <p style={{ color: 'var(--muted)', fontSize: 13, fontWeight: 500, margin: 0 }}>Waiting for price rounds</p>
+        <p style={{ color: 'var(--subtle)', fontSize: 12, margin: 0 }}>Chart populates once 2 rounds are published.</p>
       </div>
-    )
-  }
-
-  if (history.length < 2) {
-    return (
-      <div style={{ borderRadius: 18, padding: 24, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-        <Header count={0} />
-        <div style={{ height: 220, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-            <rect width="40" height="40" rx="10" fill="var(--bg-muted)" />
-            <path d="M8 28L15 20L22 23L32 13" stroke="var(--border-strong)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx="32" cy="13" r="2.5" fill="#00D66F" fillOpacity="0.5" />
-          </svg>
-          <p style={{ color: 'var(--muted)', fontSize: 13, fontWeight: 500, margin: 0 }}>Waiting for price rounds</p>
-          <p style={{ color: 'var(--subtle)', fontSize: 12, margin: 0 }}>Chart populates once 2 rounds are published.</p>
-        </div>
-      </div>
-    )
-  }
+    </div>
+  )
 
   return (
     <div style={{ borderRadius: 18, padding: 24, background: 'var(--bg-card)', border: '1px solid var(--border)', position: 'relative' }}>
       <Header count={history.length} />
-
-      <div style={{ position: 'relative', height: 220 }}>
+      <div style={{ position: 'relative', height: H_CHART }}>
         <canvas
           ref={canvasRef}
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'crosshair' }}
-          onMouseMove={onMouseMove}
-          onTouchStart={onTouchStart}
+          onMouseMove={e => handlePointer(e.clientX)}
+          onTouchStart={e => { e.preventDefault(); handlePointer(e.touches[0].clientX) }}
         />
         {tooltip && (
           <div style={{
-            position:   'absolute',
-            left:       Math.min(tooltip.x + 10, 200),
-            top:        Math.max(tooltip.y - 44, 0),
-            pointerEvents: 'none',
-            opacity:    tooltip.opacity,
-            transition: 'opacity 0.08s linear',
-            background: 'rgba(6,10,18,0.93)',
-            border:     '1px solid rgba(0,214,111,0.28)',
-            borderRadius: 9,
-            padding:    '7px 12px',
-            boxShadow:  '0 4px 20px rgba(0,0,0,0.55)',
+            position: 'absolute',
+            left: Math.min(tooltip.x + 12, 210),
+            top:  Math.max(tooltip.y - 48, 0),
+            pointerEvents: 'none', opacity: tooltip.opacity,
+            background: 'rgba(6,10,18,0.93)', border: '1px solid rgba(0,214,111,0.28)',
+            borderRadius: 9, padding: '7px 12px', boxShadow: '0 4px 20px rgba(0,0,0,0.55)',
           }}>
             <p style={{ color: '#fff', fontSize: 13, fontWeight: 700, margin: 0, fontVariantNumeric: 'tabular-nums' }}>
-              {tooltip.price.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} NGN
+              {tooltip.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} NGN
             </p>
             <p style={{ color: '#64748b', fontSize: 11, margin: '2px 0 0' }}>{tooltip.time}</p>
           </div>
@@ -387,16 +326,10 @@ function Header({ count }: { count: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
       <div>
-        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--subtle)', margin: 0 }}>
-          Price History
-        </p>
-        <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', margin: '3px 0 0', fontFamily: "'Space Grotesk', sans-serif" }}>
-          USDC / NGN
-        </p>
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--subtle)', margin: 0 }}>Price History</p>
+        <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', margin: '3px 0 0', fontFamily: "'Space Grotesk', sans-serif" }}>USDC / NGN</p>
       </div>
-      {count > 0 && (
-        <span style={{ fontSize: 11, color: 'var(--subtle)' }}>{count} updates</span>
-      )}
+      {count > 0 && <span style={{ fontSize: 11, color: 'var(--subtle)' }}>{count} updates</span>}
     </div>
   )
 }
