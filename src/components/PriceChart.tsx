@@ -50,8 +50,8 @@ function buildYAxis(minPrice: number, maxPrice: number): { ticks: number[]; yMin
   const minSpread = maxPrice * 0.005
   const spread = Math.max(range, minSpread)
 
-  // Pick a step that gives roughly 5-6 visible ticks
-  const rawStep = spread / 5
+  // Pick a step that gives exactly 4 intervals = 5 ticks
+  const rawStep = spread / 4
   const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)))
   const niceStep = (() => {
     const ratio = rawStep / magnitude
@@ -73,7 +73,15 @@ function buildYAxis(minPrice: number, maxPrice: number): { ticks: number[]; yMin
   // Always ensure yMax tick exists
   if (ticks[ticks.length - 1] < yMax) ticks.push(Math.round(yMax))
 
-  return { ticks, yMin, yMax }
+  // Hard cap: never show more than 5 ticks -- thin out evenly if over
+  const MAX_TICKS = 5
+  const final = ticks.length <= MAX_TICKS
+    ? ticks
+    : Array.from({ length: MAX_TICKS }, (_, i) =>
+        ticks[Math.round(i * (ticks.length - 1) / (MAX_TICKS - 1))]
+      )
+
+  return { ticks: final, yMin, yMax }
 }
 
 function toCanvasY(val: number, yMin: number, yMax: number, h: number): number {

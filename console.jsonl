@@ -824,3 +824,14 @@
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793483567446}
 {"level":"debug","message":"[vite] hot updated: /src/components/PriceChart.tsx","timestamp":1793483568764}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793483568764}
+{"level":"debug","message":"[vite] connected.","timestamp":1793483607672}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793483748732}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793483749100}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793483749102}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793484309445}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793484309455}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793484309459}
+{"level":"debug","message":"[vite] connected.","timestamp":1793484323778}
+{"level":"debug","message":"[vite] connected.","timestamp":1793484442549}
+{"level":"debug","message":"[vite] hot updated: /src/components/ReporterInfo.tsx","timestamp":1793484463440}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793484463441}
