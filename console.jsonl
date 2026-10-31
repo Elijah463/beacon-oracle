@@ -803,3 +803,11 @@
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793478745677}
 {"level":"debug","message":"[vite] hot updated: /src/components/OracleStats.tsx","timestamp":1793478747125}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793478747126}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793480188748}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793480188752}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793480188754}
+{"level":"debug","message":"[vite] connected.","timestamp":1793480219228}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793480964937}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793480964945}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793480964950}
+{"level":"debug","message":"[vite] connected.","timestamp":1793481288789}

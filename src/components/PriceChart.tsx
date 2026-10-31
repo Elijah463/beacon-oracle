@@ -92,9 +92,12 @@ export function PriceChart({ history, price: _price, loading }: PriceChartProps)
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    const dpr = window.devicePixelRatio || 1
-    const w = canvas.width  / dpr
-    const h = canvas.height / dpr
+    // Use offsetWidth/offsetHeight (CSS pixels) -- these are always correct
+    // regardless of whether the resize effect has run yet. canvas.width/dpr
+    // can be stale (HTML default 300px) on the first animate frame.
+    const w = canvas.offsetWidth  || canvas.width  / (window.devicePixelRatio || 1)
+    const h = canvas.offsetHeight || canvas.height / (window.devicePixelRatio || 1)
+    if (w < 10 || h < 10) return  // not yet mounted / zero-size
 
     ctx.clearRect(0, 0, w, h)
 
