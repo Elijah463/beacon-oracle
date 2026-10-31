@@ -96,7 +96,7 @@ export function PriceChart({ history, price: _price, loading }: PriceChartProps)
     const w = canvas.width  / dpr
     const h = canvas.height / dpr
 
-    ctx.clearRect(0, 0, w * dpr, h * dpr)
+    ctx.clearRect(0, 0, w, h)
 
     if (history.length < 2) return
 
@@ -106,7 +106,7 @@ export function PriceChart({ history, price: _price, loading }: PriceChartProps)
     const { ticks: yTicks, yMin, yMax } = buildYAxis(minP, maxP)
 
     // ── Y-axis grid lines + labels ──────────────────────────────────────
-    ctx.font = `10px DM Sans, sans-serif`
+    ctx.font = `600 10px system-ui, sans-serif`
     ctx.textAlign = 'right'
     for (const tick of yTicks) {
       if (tick === yMin && yMin === 0) continue   // skip zero label when baseline is 0

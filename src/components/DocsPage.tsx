@@ -10,142 +10,60 @@ import { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Copy, Check, ExternalLink } from 'lucide-react'
 import { BeaconMark } from './BeaconLogo'
 
-// ── Architecture flow diagram (docs) ───────────────────────────────────────
-const ARCH_STEPS = [
-  {
-    icon: '◎',
-    col: '#60a5fa',
-    label: 'Market Sources',
-    sub: '8 independent price feeds',
-    detail: 'Five CEX spot markets supply USDC/USD. Three independent APIs supply USD/NGN rates. All sources are fetched in parallel every 30 seconds.',
-  },
-  {
-    icon: '⬡',
-    col: '#a78bfa',
-    label: 'Aggregator',
-    sub: 'Median + outlier filter',
-    detail: 'Each price leg is median-aggregated independently. A 10% outlier filter removes any source that deviates too far from the group. A minimum quorum of 2 sources per leg is required before aggregation proceeds.',
-  },
-  {
-    icon: '⬢',
-    col: '#f472b6',
-    label: 'ECDSA Signer',
-    sub: 'Signing key verification',
-    detail: 'The reporter signs keccak256(contractAddress, answer, timestamp, nextRoundId) with a dedicated private key. The contract verifies this signature on-chain -- no trusted submitter address required.',
-  },
-  {
-    icon: '◈',
-    col: '#00D66F',
-    label: 'BEACON Contract',
-    sub: 'On-chain round storage',
-    detail: 'transmit() verifies the ECDSA signature, enforces monotonic timestamps, checks the deviation circuit breaker, and writes the round into a 100-slot circular buffer. Any contract can read via AggregatorV3Interface.',
-  },
-]
-
-const EDGE_LABELS = ['price data', 'signed payload', 'transmit()']
-
-function hexToRgbDocs(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  return `${r},${g},${b}`
-}
+// ── Static architecture diagram (docs) ────────────────────────────────────
 
 function ArchFlowDiagram() {
-  const [active, setActive] = useState<number | null>(null)
-  const [animStep, setAnimStep] = useState(0)
-
-  useEffect(() => {
-    const id = setInterval(() => setAnimStep(s => (s + 1) % (ARCH_STEPS.length + 1)), 1200)
-    return () => clearInterval(id)
-  }, [])
-
-  const displayed = active !== null ? active : animStep % ARCH_STEPS.length
-
+  const col = { blue: '#60a5fa', purple: '#a78bfa', pink: '#f472b6', green: '#00D66F' }
+  const box = (c: string, title: string, lines: string[]) => (
+    <div style={{
+      border: `1px solid ${c}55`, borderRadius: 12, padding: '14px 16px',
+      background: `rgba(${parseInt(c.slice(1,3),16)},${parseInt(c.slice(3,5),16)},${parseInt(c.slice(5,7),16)},0.07)`,
+      flex: '1 1 180px', minWidth: 160,
+    }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: c, marginBottom: 6, fontFamily: "'Space Grotesk', sans-serif" }}>{title}</div>
+      {lines.map((l, i) => (
+        <div key={i} style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.6, marginBottom: 2 }}>{l}</div>
+      ))}
+    </div>
+  )
+  const arrow = (label: string) => (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 6px', flexShrink: 0, minWidth: 60 }}>
+      <div style={{ fontSize: 10, color: '#475569', marginBottom: 2, textAlign: 'center', whiteSpace: 'nowrap' }}>{label}</div>
+      <div style={{ fontSize: 18, color: '#334155' }}>→</div>
+    </div>
+  )
   return (
     <div style={{ width: '100%' }}>
-      <style>{`
-        @keyframes archSlideRight { from { left: 0; } to { left: 100%; } }
-        .arch-docs-flow { display: flex; align-items: flex-start; justify-content: center; gap: 0; flex-wrap: wrap; }
-        .arch-docs-node { width: 130px; cursor: pointer; }
-        @media (max-width: 600px) {
-          .arch-docs-flow { flex-direction: column; align-items: center; }
-          .arch-docs-node { width: 80vw; max-width: 300px; }
-          .arch-docs-connector { flex-direction: row !important; width: auto !important; height: 36px !important; }
-          .arch-docs-connector-line { width: 2px !important; height: 100% !important; }
-        }
-      `}</style>
-
-      {/* Step nodes */}
-      <div className="arch-docs-flow">
-        {ARCH_STEPS.map((node, i) => (
-          <div key={node.label} style={{ display: 'contents' }}>
-            <div
-              className="arch-docs-node"
-              onClick={() => setActive(active === i ? null : i)}
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                gap: 8, padding: '16px 12px',
-                background: animStep > i || active === i
-                  ? `linear-gradient(135deg, rgba(${hexToRgbDocs(node.col)},0.14), rgba(${hexToRgbDocs(node.col)},0.04))`
-                  : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${animStep > i || active === i ? node.col + '66' : 'rgba(255,255,255,0.07)'}`,
-                borderRadius: 14, transition: 'all 0.4s ease',
-                boxShadow: animStep > i || active === i ? `0 0 20px rgba(${hexToRgbDocs(node.col)},0.15)` : 'none',
-              }}
-            >
-              <span style={{ fontSize: 26, color: animStep > i || active === i ? node.col : '#334155', transition: 'color 0.4s' }}>{node.icon}</span>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: animStep > i || active === i ? '#f1f5f9' : '#475569', transition: 'color 0.4s', fontFamily: "'Space Grotesk', sans-serif" }}>
-                  {node.label}
-                </div>
-                <div style={{ fontSize: 10, color: animStep > i || active === i ? '#94a3b8' : '#334155', marginTop: 2, transition: 'color 0.4s' }}>
-                  {node.sub}
-                </div>
-              </div>
-              <div style={{ fontSize: 9, color: '#475569', marginTop: 2 }}>tap for details</div>
-            </div>
-
-            {i < ARCH_STEPS.length - 1 && (
-              <div className="arch-docs-connector" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 40, flexShrink: 0, paddingTop: 28 }}>
-                <div className="arch-docs-connector-line" style={{
-                  height: 2, width: '100%', position: 'relative',
-                  background: animStep > i
-                    ? `linear-gradient(90deg, ${ARCH_STEPS[i].col}, ${ARCH_STEPS[i + 1].col})`
-                    : 'rgba(255,255,255,0.08)',
-                  transition: 'background 0.4s',
-                }}>
-                  {animStep === i + 1 && (
-                    <div style={{
-                      position: 'absolute', top: '50%', transform: 'translateY(-50%)',
-                      width: 7, height: 7, borderRadius: '50%',
-                      background: ARCH_STEPS[i].col, boxShadow: `0 0 7px ${ARCH_STEPS[i].col}`,
-                      animation: 'archSlideRight 1.2s linear',
-                    }} />
-                  )}
-                </div>
-                <div style={{ fontSize: 9, color: '#334155', marginTop: 3, textAlign: 'center' }}>
-                  {animStep > i ? EDGE_LABELS[i] : ''}
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+      {/* Row 1: Data collection */}
+      <div style={{ fontSize: 11, fontWeight: 600, color: '#475569', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Step 1 — Data Collection (every 30s)</div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
+        {box(col.blue, 'USDC/USD leg', ['5 CEX spot markets', 'fetched in parallel', 'quorum: 2 of 5'])}
+        {box(col.blue, 'USD/NGN leg', ['3 independent APIs', '1 real-time, 2 cached', 'quorum: 2 of 3'])}
       </div>
 
-      {/* Detail panel for selected or auto-highlighted node */}
-      <div style={{
-        marginTop: 16, padding: '14px 18px',
-        background: `rgba(${hexToRgbDocs(ARCH_STEPS[displayed].col)},0.07)`,
-        border: `1px solid ${ARCH_STEPS[displayed].col}44`,
-        borderRadius: 12, transition: 'all 0.3s ease',
-      }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: ARCH_STEPS[displayed].col, marginBottom: 6, fontFamily: "'Space Grotesk', sans-serif" }}>
-          {ARCH_STEPS[displayed].icon} {ARCH_STEPS[displayed].label}
-        </div>
-        <div style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.6 }}>
-          {ARCH_STEPS[displayed].detail}
-        </div>
+      {/* Row 2: Aggregation */}
+      <div style={{ fontSize: 11, fontWeight: 600, color: '#475569', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Step 2 — Aggregation</div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+        {box(col.purple, 'Outlier Rejection', ['10% filter per leg', 'removes bad sources', 'post-filter quorum check'])}
+        {box(col.purple, 'Median', ['median(USDC/USD prices)', '× median(USD/NGN rates)', '= USDC/NGN (8 decimals)'])}
+      </div>
+
+      {/* Row 3: Publish decision */}
+      <div style={{ fontSize: 11, fontWeight: 600, color: '#475569', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, marginTop: 20 }}>Step 3 — Publish Decision</div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
+        {box(col.pink, 'Deviation Gate', ['compare vs last on-chain price', 'submit if ≥ 0.1% (10 bps)', 'skip if within threshold'])}
+        {box(col.pink, 'Heartbeat', ['force-publish after 1h', 'even if price is stable', 'skip if 0% difference'])}
+        {box(col.pink, 'First Round', ['always publish immediately', 'no prior price to compare', ''])}
+      </div>
+
+      {/* Row 4: On-chain */}
+      <div style={{ fontSize: 11, fontWeight: 600, color: '#475569', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Step 4 — On-chain Submission</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        {box(col.green, 'ECDSA Signature', ['signs: contract address', '+ answer + timestamp', '+ nextRoundId'])}
+        {arrow('transmit()')}
+        {box(col.green, 'BEACON Contract', ['verifies signature', 'checks circuit breaker', 'writes round to buffer'])}
+        {arrow('read')}
+        {box(col.green, 'Consumers', ['latestRoundData()', 'getRoundData(id)', 'AggregatorV3Interface'])}
       </div>
     </div>
   )
@@ -633,8 +551,8 @@ contract NairaPayment {
           the update and waits for the next cycle.
         </P>
         <P>
-          BEACON uses a deviation threshold of <strong style={{ color: '#f1f5f9' }}>20 basis points (0.20%)</strong>.
-          This means the price must move by at least 0.20% before a new round is written.
+          BEACON uses a deviation threshold of <strong style={{ color: '#f1f5f9' }}>10 basis points (0.10%)</strong>.
+          This means the price must move by at least 0.10% before a new round is written.
         </P>
 
         <H3>Why it matters for integrators</H3>
@@ -659,7 +577,7 @@ contract NairaPayment {
 
         <Code lang="solidity">{`// Read current parameters from the contract
 uint256 maxStaleness         = beacon.maxStaleness();          // seconds
-uint256 deviationThresholdBps = beacon.deviationThresholdBps(); // basis points (20 = 0.20%)
+uint256 deviationThresholdBps = beacon.deviationThresholdBps(); // basis points (10 = 0.10%)
 
 // In your consumer contract: guard against stale data
 (, int256 price, , uint256 updatedAt,) = beacon.latestRoundData();
@@ -669,7 +587,7 @@ require(
 );`}</Code>
 
         <Note type="info">
-          Basis points (bps) are hundredths of a percent. 1 bps = 0.01%. 20 bps = 0.20%.
+          Basis points (bps) are hundredths of a percent. 1 bps = 0.01%. 10 bps = 0.10%.
           The contract stores thresholds as raw bps integers so arithmetic stays integer-only.
         </Note>
       </>
@@ -840,8 +758,8 @@ bool ok = beacon.isAuthorizedConsumer(myContractAddress);`}</Code>
         <Code lang="text">{`Proxy (permanent address -- always use this):
   ${CONTRACT}
 
-Current implementation v7:
-  0x71d2fe7ca6bb8ead42a5bde78d64a1bb07ea7779`}</Code>
+Current implementation:
+  0x96a8858464C9BdCf767949040a2fa66dcae6D41b`}</Code>
 
         <H3>What happens on upgrade</H3>
         <P>
@@ -895,6 +813,92 @@ event NewTransmission(
         >
           View contract on explorer <ExternalLink size={14} />
         </a>
+      </>
+    ),
+  },
+  {
+    id: 'chainlink-migration',
+    title: 'Chainlink Migration',
+    content: () => (
+      <>
+        <H2>Migrating from Chainlink</H2>
+        <P>
+          BEACON implements the Chainlink <IL>AggregatorV3Interface</IL> in full.
+          If your contract already reads from any Chainlink price feed, switching to
+          BEACON requires changing one address -- nothing else.
+        </P>
+
+        <H3>Interface compatibility</H3>
+        <P>
+          Every function Chainlink consumer contracts call is present on BEACON with
+          identical signatures and return types:
+        </P>
+        <Code lang="solidity">{`// These work identically on BEACON and Chainlink feeds
+function latestRoundData() external view returns (
+    uint80 roundId,
+    int256 answer,        // USDC/NGN price, 8 decimals
+    uint256 startedAt,
+    uint256 updatedAt,
+    uint80 answeredInRound
+);
+
+function getRoundData(uint80 _roundId) external view returns (
+    uint80 roundId,
+    int256 answer,
+    uint256 startedAt,
+    uint256 updatedAt,
+    uint80 answeredInRound
+);
+
+function decimals() external view returns (uint8);   // returns 8
+function description() external view returns (string memory);
+function version() external view returns (uint256);`}</Code>
+
+        <H3>Drop-in replacement</H3>
+        <P>
+          If your contract declares a Chainlink feed as <IL>AggregatorV3Interface</IL>,
+          simply pass the BEACON proxy address instead. No recompile of your ABI is
+          needed because BEACON satisfies the same interface.
+        </P>
+        <Code lang="solidity">{`// Before (Chainlink feed)
+AggregatorV3Interface feed = AggregatorV3Interface(0xChainlinkFeedAddress);
+
+// After (BEACON -- one-line change)
+AggregatorV3Interface feed = AggregatorV3Interface(
+    0xe0e4894106B1e517752515D40601ec890262e0ea
+);
+
+// All existing calls work unchanged
+(, int256 price, , uint256 updatedAt, ) = feed.latestRoundData();
+require(block.timestamp - updatedAt <= 3600, "stale");
+uint256 ngnAmount = uint256(price) * usdcAmount / 1e8;`}</Code>
+
+        <H3>Round ID encoding</H3>
+        <P>
+          BEACON encodes round IDs the same way Chainlink does: <IL>phaseId &lt;&lt; 64 | counter</IL>.
+          If your contract stores or compares round IDs, they will continue to work correctly.
+          The phase increments on each UUPS upgrade, exactly matching Chainlink&apos;s
+          aggregator-rotation pattern.
+        </P>
+
+        <H3>Key differences to be aware of</H3>
+        <Code lang="text">{`Feature              Chainlink              BEACON
+-------              ---------              ------
+Interface            AggregatorV3Interface  AggregatorV3Interface (identical)
+Decimals             8                      8
+Round ID encoding    phaseId << 64 | id     phaseId << 64 | id (identical)
+Staleness check      reverts on stale       reverts on stale (maxStaleness param)
+Circuit breaker      no                     yes -- freezes on 50% single-move
+History depth        unlimited              100 rounds circular buffer
+Upgrade pattern      new contract address   UUPS proxy -- address never changes
+Auth model           node network           ECDSA signed by dedicated signing key`}</Code>
+
+        <Note type="info">
+          The 100-round circular buffer means <IL>getRoundData()</IL> will revert for
+          round IDs older than the last 100 rounds. If your contract walks historical
+          rounds, add a bounds check or use the <IL>latestRound()</IL> value to determine
+          the earliest available round.
+        </Note>
       </>
     ),
   },

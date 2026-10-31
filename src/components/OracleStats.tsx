@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Activity, Sliders, ShieldAlert, Hash, Info } from 'lucide-react'
 
 interface OracleStatsProps {
@@ -6,6 +6,7 @@ interface OracleStatsProps {
   deviationThresholdBps: number | null
   circuitBreakerBps: number | null
   roundId: number | null
+  updatedAt: number | null   // unix seconds of last on-chain publish
 }
 
 const TOOLTIPS: Record<string, string> = {
@@ -15,7 +16,7 @@ const TOOLTIPS: Record<string, string> = {
   'Circuit Breaker': 'If a single price update would move the on-chain price by more than this threshold, the contract blocks the update and sets a trip flag. The owner must manually reset it. Protects against data source errors or manipulation.',
 }
 
-function StatCard({ icon, label, value, mono }: { icon: React.ReactNode; label: string; value: string; mono: boolean }) {
+function StatCard({ icon, label, value, mono, sub }: { icon: React.ReactNode; label: string; value: string; mono: boolean; sub?: string }) {
   const [show, setShow] = useState(false)
   const tip = TOOLTIPS[label]
 
@@ -56,6 +57,12 @@ function StatCard({ icon, label, value, mono }: { icon: React.ReactNode; label: 
         {value}
       </p>
 
+      {sub && (
+        <p style={{ fontSize: 10, color: 'var(--subtle)', margin: '4px 0 0', fontVariantNumeric: 'tabular-nums' }}>
+          {sub}
+        </p>
+      )}
+
       {show && tip && (
         <div style={{
           position: 'absolute', bottom: 'calc(100% + 8px)', left: 0,
@@ -73,31 +80,61 @@ function StatCard({ icon, label, value, mono }: { icon: React.ReactNode; label: 
   )
 }
 
-export function OracleStats({ maxStaleness, deviationThresholdBps, circuitBreakerBps, roundId }: OracleStatsProps) {
+/** Countdown ticker: returns "Xm Ys" until next heartbeat, or "now" if overdue */
+function useHeartbeatCountdown(updatedAt: number | null, heartbeatSecs: number | null): string {
+  const [label, setLabel] = useState('--')
+
+  useEffect(() => {
+    if (updatedAt === null || heartbeatSecs === null) return
+
+    const tick = () => {
+      const nextAt = updatedAt + heartbeatSecs
+      const remaining = nextAt - Math.floor(Date.now() / 1000)
+      if (remaining <= 0) { setLabel('now'); return }
+      const m = Math.floor(remaining / 60)
+      const s = remaining % 60
+      setLabel(m > 0 ? `${m}m ${s.toString().padStart(2, '0')}s` : `${s}s`)
+    }
+
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [updatedAt, heartbeatSecs])
+
+  return label
+}
+
+export function OracleStats({ maxStaleness, deviationThresholdBps, circuitBreakerBps, roundId, updatedAt }: OracleStatsProps) {
+  const countdown = useHeartbeatCountdown(updatedAt, maxStaleness)
+
   const stats = [
     {
       icon: <Hash size={15} style={{ color: 'var(--brand)' }} />,
       label: 'Latest Round',
       value: roundId !== null ? `#${roundId}` : '--',
       mono: true,
+      sub: undefined,
     },
     {
       icon: <Activity size={15} style={{ color: 'var(--brand)' }} />,
       label: 'Heartbeat',
       value: maxStaleness !== null ? `${Math.floor(maxStaleness / 60)}m` : '--',
       mono: false,
+      sub: countdown !== '--' ? `next in ${countdown}` : undefined,
     },
     {
       icon: <Sliders size={15} style={{ color: 'var(--brand)' }} />,
       label: 'Deviation Threshold',
       value: deviationThresholdBps !== null ? `${(deviationThresholdBps / 100).toFixed(2)}%` : '--',
       mono: false,
+      sub: undefined,
     },
     {
       icon: <ShieldAlert size={15} style={{ color: 'var(--brand)' }} />,
       label: 'Circuit Breaker',
       value: circuitBreakerBps !== null ? `${(circuitBreakerBps / 100).toFixed(0)}%` : '--',
       mono: false,
+      sub: undefined,
     },
   ]
 

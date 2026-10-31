@@ -7,11 +7,13 @@
  *        derive USDC/NGN, then decide whether to publish on-chain.
  *
  * PUBLISH RULES (Chainlink-style):
- *   1. DEVIATION GATE: only publish if the new price deviates >= 0.2% from the
- *      last successfully published on-chain price.
- *   2. HEARTBEAT: if the price has stayed within 0.2% for >= 1 hour without
- *      a publish, force a publish regardless (heartbeat trigger). This uses
- *      the most recently derived 30-second price round, not the first one.
+ *   1. DEVIATION GATE: only publish if the new price deviates >= 0.1% (10 bps)
+ *      from the last successfully published on-chain price.
+ *   2. HEARTBEAT: if the price has stayed within 0.1% for >= 1 hour without
+ *      a publish, force a publish -- UNLESS the derived price is identical to
+ *      the last on-chain price (0 bps deviation), in which case skip to avoid
+ *      wasting gas on a no-op update. This uses the most recently derived
+ *      30-second price, not the first one after the heartbeat fires.
  *   3. FIRST ROUND: always publish -- no prior price to compare.
  *
  * CIRCUIT BREAKER (on-chain):
@@ -493,20 +495,28 @@ function shouldSubmit(newPrice: bigint, nowSecs: number): SubmitDecision {
     : lastPublishedPrice - newPrice
   const deviationBps = (absDiff * 10_000n) / lastPublishedPrice
 
-  // Rule 3: heartbeat -- publish if no update for >= 1 hour, using latest derived price
-  const secondsSincePublish = nowSecs - lastPublishedAt
-  if (secondsSincePublish >= HEARTBEAT_SECS) {
-    console.log(
-      `[decision] Heartbeat triggered: ${secondsSincePublish}s since last publish (threshold ${HEARTBEAT_SECS}s). ` +
-      `Deviation ${deviationBps}bps. Publishing latest 30s derived price.`
-    )
-    return { submit: true, reason: 'heartbeat' }
-  }
-
-  // Rule 2: deviation gate -- only publish if price moved >= 0.2% (20 bps)
+  // Rule 2: deviation gate -- publish if price moved >= threshold bps from last on-chain price
   if (deviationBps >= DEVIATION_GATE_BPS) {
     console.log(`[decision] Deviation ${deviationBps}bps >= gate ${DEVIATION_GATE_BPS}bps. Submitting.`)
     return { submit: true, reason: 'deviation' }
+  }
+
+  // Rule 3: heartbeat -- publish if no update for >= 1 hour, BUT skip if price is
+  // identical to last on-chain price (0 bps) -- no point wasting gas on a no-op round.
+  const secondsSincePublish = nowSecs - lastPublishedAt
+  if (secondsSincePublish >= HEARTBEAT_SECS) {
+    if (deviationBps === 0n) {
+      console.log(
+        `[decision] Heartbeat window elapsed (${secondsSincePublish}s) but price is IDENTICAL ` +
+        `to last on-chain value (0 bps). Skipping heartbeat to avoid gas waste.`
+      )
+      return { submit: false, reason: 'within-deviation' }
+    }
+    console.log(
+      `[decision] Heartbeat triggered: ${secondsSincePublish}s since last publish. ` +
+      `Deviation ${deviationBps}bps (below gate but non-zero). Publishing.`
+    )
+    return { submit: true, reason: 'heartbeat' }
   }
 
   console.log(

@@ -1,4 +1,4 @@
-import { ExternalLink, Radio } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 
 interface ReporterInfoProps {
   reporter: string | null
@@ -31,8 +31,8 @@ export function ReporterInfo({ reporter, contractAddress }: ReporterInfoProps) {
       style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
     >
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--brand-muted)' }}>
-          <Radio size={14} style={{ color: 'var(--brand)' }} />
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center overflow-hidden" style={{ background: 'var(--brand-muted)' }}>
+          <img src="/Beacon_Logo.png" alt="Arc" width={18} height={18} style={{ objectFit: 'contain' }} />
         </div>
         <div>
           <p className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'var(--subtle)', letterSpacing: '0.08em' }}>Network</p>
@@ -64,8 +64,7 @@ export function ReporterInfo({ reporter, contractAddress }: ReporterInfoProps) {
 
       <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
         <p className="text-xs" style={{ color: 'var(--subtle)' }}>
-          UUPS Upgradeable. Single trusted reporter for testnet PoC.
-          Upgrade to multi-node by replacing the reporter address.
+          UUPS Upgradeable. Extend to multi-node by replacing the reporter address.
         </p>
       </div>
     </div>

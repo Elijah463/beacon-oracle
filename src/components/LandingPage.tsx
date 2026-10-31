@@ -386,7 +386,7 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
           <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap', justifyContent: 'center', marginTop: 56, paddingTop: 36, borderTop: '1px solid rgba(255,255,255,0.07)', width: '100%', marginBottom: 72 }}>
             {[
               { value: '8', label: 'Decimal precision' },
-              { value: '0.2%', label: 'Deviation threshold' },
+              { value: '0.1%', label: 'Deviation threshold' },
               { value: '1h', label: 'Heartbeat' },
               { value: 'UUPS', label: 'Upgradeable proxy' },
             ].map(({ value, label }) => (
@@ -425,7 +425,7 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
               icon: <Zap size={20} color="#00D66F" />,
               title: 'Off-chain aggregation',
               body: 'Eight independent market sources are sampled every cycle. Outliers are rejected before median aggregation. Both price legs (USDC/USD and USD/NGN) require quorum to proceed.',
-              bullets: ['Outlier rejection', '0.2% deviation gate', '1h heartbeat publish', 'Quorum required on both legs'],
+              bullets: ['Outlier rejection', '0.1% deviation gate', '1h heartbeat publish', 'Quorum required on both legs'],
             },
             {
               icon: <Shield size={20} color="#818cf8" />,
@@ -533,7 +533,7 @@ export function LandingFooter({ onEnterDashboard, onOpenDocs }: { onEnterDashboa
           </div>
         </div>
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <span style={{ fontSize: 12, color: '#475569' }}>&copy; {CURRENT_YEAR} BEACON. Built on Arc by Circle.</span>
+          <span style={{ fontSize: 12, color: '#475569' }}>&copy; {CURRENT_YEAR} BEACON. Built on Arc.</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <a href="https://studio.arc.io/" target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#334155', textDecoration: 'none', letterSpacing: '0.01em' }}>
               Built with Arc Studio
