@@ -25,30 +25,14 @@ const PAD_T  = 14
 const PAD_B  = 14
 const H_CHART = 220
 
-// ── Y-axis builder: exactly 5 evenly-spaced ticks ──────────────────────────
-function buildYAxis(minP: number, maxP: number) {
-  const mid    = (minP + maxP) / 2
-  // Enforce minimum 0.5% visible spread
-  const spread = Math.max(maxP - minP, mid * 0.005)
-
-  // Nice step for 4 intervals
-  const rawStep   = spread / 4
-  const mag       = Math.pow(10, Math.floor(Math.log10(rawStep)))
-  const niceStep  = (() => {
-    const r = rawStep / mag
-    if (r < 1.5) return mag
-    if (r < 3.5) return 2 * mag
-    if (r < 7.5) return 5 * mag
-    return 10 * mag
-  })()
-
-  // Snap min/max to step, centered on mid
-  const yMin = Math.max(0, Math.floor((mid - spread * 0.65) / niceStep) * niceStep)
-  const yMax = Math.ceil((mid + spread * 0.65) / niceStep) * niceStep
-
-  // Exactly 5 ticks evenly spaced between yMin and yMax
-  const ticks = Array.from({ length: 5 }, (_, i) => yMin + (i / 4) * (yMax - yMin))
-
+// ── Y-axis builder: 5 consecutive whole integers centered on live price ───────
+// e.g. live price 1347 → ticks [1345, 1346, 1347, 1348, 1349]
+// yMin/yMax give 0.5 padding below/above so the line never touches the edge
+function buildYAxis(livePrice: number) {
+  const center = Math.round(livePrice)
+  const ticks  = [center - 2, center - 1, center, center + 1, center + 2]
+  const yMin   = center - 2.5
+  const yMax   = center + 2.5
   return { ticks, yMin, yMax }
 }
 
@@ -94,11 +78,10 @@ function buildSpline(pts: {x: number; y: number}[]): {x: number; y: number; cp1x
 
 // ── Label formatter ─────────────────────────────────────────────────────────
 function fmtY(v: number) {
-  // Show enough decimals to distinguish ticks -- use 2 for NGN prices ~1600
-  return v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+  return Math.round(v).toLocaleString('en-US')
 }
 
-export function PriceChart({ history, price: _price, loading }: PriceChartProps) {
+export function PriceChart({ history, price, loading }: PriceChartProps) {
   const canvasRef   = useRef<HTMLCanvasElement>(null)
   const progressRef = useRef(0)
   const rafRef      = useRef<number>(0)
@@ -121,9 +104,9 @@ export function PriceChart({ history, price: _price, loading }: PriceChartProps)
 
     const prices = history.map(r => r.price)
     const times  = history.map(r => r.updatedAt)
-    const minP   = Math.min(...prices), maxP = Math.max(...prices)
     const minT   = Math.min(...times),  maxT = Math.max(...times)
-    const { ticks, yMin, yMax } = buildYAxis(minP, maxP)
+    const liveP  = price ?? prices[prices.length - 1]
+    const { ticks, yMin, yMax } = buildYAxis(liveP)
 
     // ── Y-axis labels + gridlines ─────────────────────────────────────────
     ctx.font      = '11px system-ui, sans-serif'
@@ -251,7 +234,8 @@ export function PriceChart({ history, price: _price, loading }: PriceChartProps)
     }
     const pt  = history[best]
     const prices = history.map(r => r.price)
-    const { yMin, yMax } = buildYAxis(Math.min(...prices), Math.max(...prices))
+    const liveP2 = price ?? prices[prices.length - 1]
+    const { yMin, yMax } = buildYAxis(liveP2)
     const cx = toX(pt.updatedAt, minT, maxT, w)
     const cy = toY(pt.price, yMin, yMax, rect.height)
 
