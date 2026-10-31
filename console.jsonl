@@ -735,3 +735,13 @@
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793402557194}
 {"level":"debug","message":"[vite] hot updated: /src/components/QuoteCalculator.tsx","timestamp":1793402747294}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793402747294}
+{"level":"debug","message":"[vite] hot updated: /src/components/QuoteCalculator.tsx","timestamp":1793402749249}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793402749249}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793403499955}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793403499964}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793403653174}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793403653318}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793404342882}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793404342890}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793405141382}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793405505687}

@@ -1,4 +1,4 @@
-app = "beacon-oracle-reporter"
+app = "beacon-oracle"
 primary_region = "ams"
 
 [build]
