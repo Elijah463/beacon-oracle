@@ -43,10 +43,14 @@ const PAD_B   = 12
  */
 function buildYAxis(minPrice: number, maxPrice: number): { ticks: number[]; yMin: number; yMax: number } {
   const range = maxPrice - minPrice
-  // If all prices are identical (1 round), use a ±0.5% spread
-  const spread = range === 0 ? maxPrice * 0.01 : range
 
-  // Pick a step that gives roughly 5-7 visible ticks
+  // Enforce a minimum visible spread of 0.5% of the price so ticks always
+  // span the full chart height even when all rounds are nearly identical.
+  // This prevents the degenerate case of 6 ticks crammed into 3 pixels.
+  const minSpread = maxPrice * 0.005
+  const spread = Math.max(range, minSpread)
+
+  // Pick a step that gives roughly 5-6 visible ticks
   const rawStep = spread / 5
   const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)))
   const niceStep = (() => {
@@ -57,14 +61,16 @@ function buildYAxis(minPrice: number, maxPrice: number): { ticks: number[]; yMin
     return 10 * magnitude
   })()
 
-  const yMin = Math.max(0, Math.floor((minPrice - spread * 0.1) / niceStep) * niceStep)
-  const yMax = Math.ceil((maxPrice + spread * 0.1) / niceStep) * niceStep
+  const midPrice = (minPrice + maxPrice) / 2
+  // Center the axis around the midpoint of actual prices
+  const yMin = Math.max(0, Math.floor((midPrice - spread * 0.6) / niceStep) * niceStep)
+  const yMax = Math.ceil((midPrice + spread * 0.6) / niceStep) * niceStep
 
   const ticks: number[] = []
   for (let t = yMin; t <= yMax + niceStep * 0.01; t += niceStep) {
     ticks.push(Math.round(t))
   }
-  // Always ensure yMax is in ticks
+  // Always ensure yMax tick exists
   if (ticks[ticks.length - 1] < yMax) ticks.push(Math.round(yMax))
 
   return { ticks, yMin, yMax }
