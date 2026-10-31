@@ -501,20 +501,22 @@ function shouldSubmit(newPrice: bigint, nowSecs: number): SubmitDecision {
     return { submit: true, reason: 'deviation' }
   }
 
-  // Rule 3: heartbeat -- publish if no update for >= 1 hour, BUT skip if price is
-  // identical to last on-chain price (0 bps) -- no point wasting gas on a no-op round.
+  // Rule 3: heartbeat -- publish if no update for >= 1 hour, BUT skip only if
+  // the derived price is BYTE-FOR-BYTE identical to the last on-chain value.
+  // We use exact BigInt equality (not bps) because bps integer-division can
+  // truncate a real sub-1-bps difference to 0, blocking legitimate heartbeats.
   const secondsSincePublish = nowSecs - lastPublishedAt
   if (secondsSincePublish >= HEARTBEAT_SECS) {
-    if (deviationBps === 0n) {
+    if (newPrice === lastPublishedPrice) {
       console.log(
-        `[decision] Heartbeat window elapsed (${secondsSincePublish}s) but price is IDENTICAL ` +
-        `to last on-chain value (0 bps). Skipping heartbeat to avoid gas waste.`
+        `[decision] Heartbeat window elapsed (${secondsSincePublish}s) but price is byte-identical ` +
+        `to last on-chain value. Skipping heartbeat to avoid gas waste.`
       )
       return { submit: false, reason: 'within-deviation' }
     }
     console.log(
       `[decision] Heartbeat triggered: ${secondsSincePublish}s since last publish. ` +
-      `Deviation ${deviationBps}bps (below gate but non-zero). Publishing.`
+      `Deviation ${deviationBps}bps (below gate). Publishing.`
     )
     return { submit: true, reason: 'heartbeat' }
   }

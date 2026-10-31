@@ -866,3 +866,7 @@
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793485684984}
 {"level":"debug","message":"[vite] hot updated: /src/components/PriceChart.tsx","timestamp":1793485684986}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793485684986}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793486816444}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793486816457}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793488090002}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793488090018}
