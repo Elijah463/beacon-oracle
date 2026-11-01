@@ -501,21 +501,17 @@ function shouldSubmit(newPrice: bigint, nowSecs: number): SubmitDecision {
     return { submit: true, reason: 'deviation' }
   }
 
-  // Rule 3: heartbeat -- publish if no update for >= 1 hour, BUT only when
-  // the price has moved at least 1 bps (0.01%) from the last published value.
-  // Changes below 1 bps are noise and not worth the gas cost.
+  // Rule 3: heartbeat -- publish unconditionally when the hour window has elapsed.
+  // Purpose: keep the feed alive regardless of price movement.
+  // We do NOT gate on a minimum bps here -- USDC/NGN is stable enough that it
+  // can sit within 0.5 bps for many hours, which would truncate to 0 in BigInt
+  // division and permanently block the heartbeat. Gas cost of one hourly publish
+  // is negligible compared to having a stale feed.
   const secondsSincePublish = nowSecs - lastPublishedAt
   if (secondsSincePublish >= HEARTBEAT_SECS) {
-    if (deviationBps < 1n) {
-      console.log(
-        `[decision] Heartbeat window elapsed (${secondsSincePublish}s) but change is ` +
-        `${deviationBps}bps (< 1 bps / 0.01%). Skipping to avoid gas waste.`
-      )
-      return { submit: false, reason: 'within-deviation' }
-    }
     console.log(
       `[decision] Heartbeat triggered: ${secondsSincePublish}s since last publish. ` +
-      `Deviation ${deviationBps}bps (>= 1 bps, below deviation gate). Publishing.`
+      `Deviation ${deviationBps}bps. Publishing.`
     )
     return { submit: true, reason: 'heartbeat' }
   }
