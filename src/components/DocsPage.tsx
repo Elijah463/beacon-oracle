@@ -37,8 +37,8 @@ function ArchFlowDiagram() {
       {/* Row 1: Data collection */}
       <div style={{ fontSize: 11, fontWeight: 600, color: '#475569', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Step 1 — Data Collection (every 30s)</div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
-        {box(col.blue, 'USDC/USD leg', ['5 CEX spot markets', 'fetched in parallel', 'quorum: 2 of 5'])}
-        {box(col.blue, 'USD/NGN leg', ['3 independent APIs', '1 real-time, 2 cached', 'quorum: 2 of 3'])}
+        {box(col.blue, 'USDC/USD leg', ['5 independent sources', 'fetched in parallel', 'quorum: 2 of 5'])}
+        {box(col.blue, 'NGN/USD leg', ['3 independent sources', 'fetched in parallel', 'quorum: 2 of 3'])}
       </div>
 
       {/* Row 2: Aggregation */}
@@ -239,8 +239,8 @@ RPC:      https://rpc.mainnet.arc.io`}</Code>
 
         <H3>How the price is derived</H3>
         <P>
-          An off-chain reporter aggregates USDC/USD spot prices from five independent CEX
-          markets and USD/NGN rates from three independent sources. Each leg is median-aggregated
+          An off-chain reporter fetches USDC/USD prices from five independent sources and
+          NGN/USD rates from three independent sources. Each leg is median-aggregated
           separately with outlier rejection applied. The final price is:
         </P>
         <Code lang="text">{`USDC/NGN = median(USDC/USD prices) × median(USD/NGN rates)`}</Code>
