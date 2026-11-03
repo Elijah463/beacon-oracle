@@ -2,7 +2,7 @@
 
 **BEACON** is a production-grade, upgradeable USDC/NGN price oracle built on Arc Network.
 
-It derives the real-time value of 1 USDC in Nigerian Naira by independently aggregating spot prices from multiple off-chain sources and publishing them on-chain through a Chainlink-compatible smart contract. External contracts can query live prices or request computed conversion quotes directly from the oracle.
+It derives the real-time value of 1 USDC in Nigerian Naira by independently aggregating spot prices from multiple off-chain sources and publishing them onchain through a Chainlink-compatible smart contract. External contracts can query live prices or request computed conversion quotes directly from the oracle.
 
 ---
 
@@ -18,7 +18,7 @@ Off-chain Reporter (Bun on Fly.io)
       |     CurrencyAPI         -- USD/NGN aggregated, cached 1h
       |-- Computes median of each leg independently
       |-- Applies outlier rejection (10% median-distance filter)
-      |-- Checks deviation vs last on-chain price (0.2% / 20 bps threshold)
+      |-- Checks deviation vs last onchain price (0.1% / 10 bps threshold)
       |-- Heartbeat: force-publish every 1h even if no deviation
       |
       v
@@ -35,8 +35,8 @@ USDCNGNOracle.sol (Arc Network)
 Consumer Contracts / Dashboard
       |-- latestRoundData()       -- Chainlink-compatible latest price
       |-- getRoundData(roundId)   -- Historical round (no staleness revert)
-      |-- quoteUSDCToNGN(amount)  -- On-chain conversion: USDC to NGN
-      |-- quoteNGNToUSDC(amount)  -- On-chain conversion: NGN to USDC
+      |-- quoteUSDCToNGN(amount)  -- Onchain conversion: USDC to NGN
+      |-- quoteNGNToUSDC(amount)  -- Onchain conversion: NGN to USDC
       |-- latestQuoteMetadata()   -- Round ID, price, age for auditability
 ```
 
@@ -107,7 +107,7 @@ beacon-oracle/
       OracleDashboard.tsx   # Live oracle dashboard
       RateCard.tsx          # Price display with flash animation
       PriceChart.tsx        # Recharts area line chart
-      QuoteCalculator.tsx   # On-chain USDC/NGN converter
+      QuoteCalculator.tsx   # Onchain USDC/NGN converter
       CircuitBreakerBanner.tsx
       OracleStats.tsx
       ReporterInfo.tsx

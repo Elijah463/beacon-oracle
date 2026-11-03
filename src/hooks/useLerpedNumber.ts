@@ -2,7 +2,7 @@
  * useLerpedNumber.ts
  * Smooth-animates a number toward its target using linear interpolation.
  * Used for the USDC/NGN rate display so price updates feel live, not jarring.
- * Only animates when the target actually changes from real on-chain data.
+ * Only animates when the target actually changes from real onchain data.
  */
 
 import { useState, useEffect, useRef } from 'react'

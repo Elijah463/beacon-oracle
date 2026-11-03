@@ -51,13 +51,13 @@ function ArchFlowDiagram() {
       {/* Row 3: Publish decision */}
       <div style={{ fontSize: 11, fontWeight: 600, color: '#475569', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, marginTop: 20 }}>Step 3 — Publish Decision</div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
-        {box(col.pink, 'Deviation Gate', ['compare vs last on-chain price', 'submit if ≥ 0.1% (10 bps)', 'skip if within threshold'])}
+        {box(col.pink, 'Deviation Gate', ['compare vs last onchain price', 'submit if ≥ 0.1% (10 bps)', 'skip if within threshold'])}
         {box(col.pink, 'Heartbeat', ['force-publish after 1h', 'even if price is stable', 'skip if 0% difference'])}
         {box(col.pink, 'First Round', ['always publish immediately', 'no prior price to compare', ''])}
       </div>
 
-      {/* Row 4: On-chain */}
-      <div style={{ fontSize: 11, fontWeight: 600, color: '#475569', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Step 4 — On-chain Submission</div>
+      {/* Row 4: Onchain */}
+      <div style={{ fontSize: 11, fontWeight: 600, color: '#475569', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Step 4 — Onchain Submission</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         {box(col.green, 'ECDSA Signature', ['signs: contract address', '+ answer + timestamp', '+ nextRoundId'])}
         {arrow('transmit()')}
@@ -210,7 +210,7 @@ const SECTIONS = [
         <H2>What is BEACON?</H2>
         <P>
           BEACON is a decentralized price oracle that publishes a tamper-resistant USDC/NGN
-          exchange rate on-chain. Any smart contract on Arc can read the current price,
+          exchange rate onchain. Any smart contract on Arc can read the current price,
           query historical rounds, or request a computed conversion directly from the oracle.
         </P>
         <P>
@@ -415,7 +415,7 @@ console.log(\`1 USDC = \${priceNGN.toFixed(2)} NGN (round #\${roundId})\`);`}</C
                 ['roundId', 'uint80', 'Phase-encoded round ID (phaseId << 64 | counter). Use the counter (lower 64 bits) for display.'],
                 ['answer', 'int256', 'USDC/NGN price with 8 decimal places. Divide by 1e8 for human-readable rate.'],
                 ['startedAt', 'uint256', 'Unix timestamp when this round started (same as updatedAt on BEACON).'],
-                ['updatedAt', 'uint256', 'Unix timestamp of the on-chain publish. Use this for staleness checks.'],
+                ['updatedAt', 'uint256', 'Unix timestamp of the onchain publish. Use this for staleness checks.'],
                 ['answeredInRound', 'uint80', 'Same as roundId for BEACON (no multi-round aggregation).'],
               ].map(([f, t, d]) => (
                 <tr key={f} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -546,7 +546,7 @@ contract NairaPayment {
         <H3>What is deviation threshold?</H3>
         <P>
           The deviation threshold is the minimum price movement (in basis points) that
-          triggers a new on-chain publish. If the newly computed USDC/NGN price differs
+          triggers a new onchain publish. If the newly computed USDC/NGN price differs
           from the last published price by less than this threshold, the reporter skips
           the update and waits for the next cycle.
         </P>
@@ -565,7 +565,7 @@ contract NairaPayment {
 
         <H3>What is the heartbeat?</H3>
         <P>
-          The heartbeat is the maximum time between on-chain publishes regardless of price
+          The heartbeat is the maximum time between onchain publishes regardless of price
           movement. Even if the price never crosses the deviation threshold, the reporter
           will still publish at least once per heartbeat period.
         </P>
@@ -600,7 +600,7 @@ require(
       <>
         <H2>Circuit Breaker</H2>
         <P>
-          The circuit breaker is an on-chain safety mechanism that freezes oracle updates
+          The circuit breaker is an onchain safety mechanism that freezes oracle updates
           if the price moves by an anomalously large amount in a single round. It protects
           downstream contracts from accepting a price that may be the result of a data
           source error or manipulation.

@@ -35,7 +35,7 @@
 - Off-chain reporter (scripts/reporter.ts) fetches USDC/USD (5 CEX sources) and NGN/USD (3 server-friendly sources: CoinGecko USDT/NGN live, ExchangeRate-API cached 24h, CurrencyAPI cached 1h)
 - Derives USDC/NGN = median(USDC/USD) x median(NGN/USD) using BigInt arithmetic
 - Signs the payload with REPORTER_SIGNING_KEY, submits via Circle developer-controlled wallet
-- Contract verifies ECDSA signature on-chain before writing each round
+- Contract verifies ECDSA signature onchain before writing each round
 - Chainlink AggregatorV3Interface compatible: latestRoundData(), getRoundData(), quoteUSDCToNGN(), quoteNGNToUSDC()
 - UUPS upgradeable: owner calls upgradeToAndCall() to upgrade implementation
 - phaseId increments on every upgrade -- encoded in upper 16 bits of roundId

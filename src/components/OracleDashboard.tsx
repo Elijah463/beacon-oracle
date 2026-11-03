@@ -135,7 +135,7 @@ function RoundHistoryTable({ history, loading }: { history: RoundPoint[]; loadin
       <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
         <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--subtle)', margin: 0 }}>Round History</p>
         <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', margin: '3px 0 0' }}>
-          {reversed.length > 0 ? `${reversed.length} on-chain round${reversed.length !== 1 ? 's' : ''}` : 'No rounds yet'}
+          {reversed.length > 0 ? `${reversed.length} onchain round${reversed.length !== 1 ? 's' : ''}` : 'No rounds yet'}
         </p>
       </div>
 

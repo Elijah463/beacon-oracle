@@ -173,7 +173,7 @@ function ArchDiagram() {
     { label: 'Market Sources', sub: '8 independent feeds', icon: '◎', col: '#60a5fa' },
     { label: 'Aggregator', sub: 'Median + outlier filter', icon: '⬡', col: '#a78bfa' },
     { label: 'ECDSA Signer', sub: 'Signing key verification', icon: '⬢', col: '#f472b6' },
-    { label: 'BEACON Contract', sub: 'On-chain round storage', icon: '◈', col: '#00D66F' },
+    { label: 'BEACON Contract', sub: 'Onchain round storage', icon: '◈', col: '#00D66F' },
   ]
 
   return (
@@ -344,14 +344,14 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
           <PriceOrb />
 
           <h1 style={{ fontSize: 'clamp(34px,5.5vw,68px)', fontWeight: 900, lineHeight: 1.06, letterSpacing: '-0.03em', color: '#fff', marginBottom: 20, fontFamily: "'Space Grotesk', sans-serif" }}>
-            The on-chain price oracle{' '}
+            The onchain price oracle{' '}
             <br />
             <span style={{ color: '#00D66F' }}>for USDC/NGN</span>
           </h1>
 
           <p style={{ fontSize: 17, lineHeight: 1.7, color: '#64748b', maxWidth: 560, margin: '0 auto 48px' }}>
             BEACON aggregates real-time exchange rate data across eight independent market sources,
-            derives a tamper-resistant USDC/NGN price, and publishes it on-chain via a
+            derives a tamper-resistant USDC/NGN price, and publishes it onchain via a
             Chainlink-compatible interface. Any smart contract can read it.
           </p>
 
@@ -408,7 +408,7 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
               Two layers. One trusted price.
             </h2>
             <p style={{ color: '#475569', fontSize: 14, marginTop: 12 }}>
-              Watch how a price moves from raw market data to an on-chain round.
+              Watch how a price moves from raw market data to an onchain round.
             </p>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, padding: '32px 20px' }}>
@@ -429,9 +429,9 @@ export function LandingPage({ onEnterDashboard, onOpenDocs }: LandingPageProps) 
             },
             {
               icon: <Shield size={20} color="#818cf8" />,
-              title: 'On-chain settlement',
+              title: 'Onchain settlement',
               body: 'Prices are ECDSA-signed and submitted to the contract. The contract verifies signatures, enforces monotonic ordering, and stores rounds in a circular buffer.',
-              bullets: ['ECDSA signature verification', '100-round history buffer', 'Staleness guard on reads', 'On-chain circuit breaker'],
+              bullets: ['ECDSA signature verification', '100-round history buffer', 'Staleness guard on reads', 'Onchain circuit breaker'],
             },
             {
               icon: <GitBranch size={20} color="#f472b6" />,
@@ -505,7 +505,7 @@ export function LandingFooter({ onEnterDashboard, onOpenDocs }: { onEnterDashboa
               <span style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.02em', lineHeight: 1 }}>BEACON</span>
             </div>
             <p style={{ marginTop: 12, fontSize: 13, color: '#475569', lineHeight: 1.65, maxWidth: 200 }}>
-              A USDC/NGN on-chain price oracle built on Arc. Chainlink-compatible. Upgradeable.
+              A USDC/NGN onchain price oracle built on Arc. Chainlink-compatible. Upgradeable.
             </p>
           </div>
           <div>

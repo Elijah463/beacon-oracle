@@ -6,14 +6,14 @@ interface OracleStatsProps {
   deviationThresholdBps: number | null
   circuitBreakerBps: number | null
   roundId: number | null
-  updatedAt: number | null   // unix seconds of last on-chain publish
+  updatedAt: number | null   // unix seconds of last onchain publish
 }
 
 const TOOLTIPS: Record<string, string> = {
-  'Latest Round': 'The sequential counter of on-chain price updates. Increments each time the reporter publishes a new price that clears the deviation threshold or heartbeat.',
-  'Heartbeat': 'Maximum time between on-chain publishes. Even if the price is stable, a new round is forced at least once per heartbeat period to prove the reporter is alive.',
-  'Deviation Threshold': 'Minimum price movement required to trigger a new on-chain publish. If the price moves less than this amount since the last round, the reporter skips the update and waits for the heartbeat. Measured in basis points (1 bps = 0.01%).',
-  'Circuit Breaker': 'If a single price update would move the on-chain price by more than this threshold, the contract blocks the update and sets a trip flag. The owner must manually reset it. Protects against data source errors or manipulation.',
+  'Latest Round': 'The sequential counter of onchain price updates. Increments each time the reporter publishes a new price that clears the deviation threshold or heartbeat.',
+  'Heartbeat': 'Maximum time between onchain publishes. Even if the price is stable, a new round is forced at least once per heartbeat period to prove the reporter is alive.',
+  'Deviation Threshold': 'Minimum price movement required to trigger a new onchain publish. If the price moves less than this amount since the last round, the reporter skips the update and waits for the heartbeat. Measured in basis points (1 bps = 0.01%).',
+  'Circuit Breaker': 'If a single price update would move the onchain price by more than this threshold, the contract blocks the update and sets a trip flag. The owner must manually reset it. Protects against data source errors or manipulation.',
 }
 
 function StatCard({ icon, label, value, mono, sub }: { icon: React.ReactNode; label: string; value: string; mono: boolean; sub?: string }) {

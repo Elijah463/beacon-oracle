@@ -1,6 +1,6 @@
 /**
  * QuoteCalculator.tsx
- * BEACON Converter -- swap-style UI for USDC/NGN on-chain quotes.
+ * BEACON Converter -- swap-style UI for USDC/NGN onchain quotes.
  * No framer-motion. Pure CSS transitions.
  */
 
@@ -114,7 +114,7 @@ export function QuoteCalculator() {
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--subtle)', margin: 0 }}>Converter</p>
-        <p style={{ fontSize: 13, color: 'var(--muted)', margin: '3px 0 0' }}>Live on-chain rate</p>
+        <p style={{ fontSize: 13, color: 'var(--muted)', margin: '3px 0 0' }}>Live onchain rate</p>
       </div>
 
       {/* From token */}
