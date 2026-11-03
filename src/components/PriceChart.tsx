@@ -19,21 +19,32 @@ interface PriceChartProps {
 interface TooltipState { price: number; time: string; x: number; y: number; opacity: number }
 
 const BRAND  = '#00D66F'
-const PAD_L  = 62   // room for "1,620.50" labels
+const PAD_L  = 46   // room for "1,345" labels
 const PAD_R  = 12
 const PAD_T  = 14
 const PAD_B  = 14
 const H_CHART = 220
 
-// ── Y-axis builder: 5 consecutive whole integers centered on live price ───────
-// e.g. live price 1347 → ticks [1345, 1346, 1347, 1348, 1349]
-// yMin/yMax give 0.5 padding below/above so the line never touches the edge
-function buildYAxis(livePrice: number) {
-  const center = Math.round(livePrice)
-  const ticks  = [center - 2, center - 1, center, center + 1, center + 2]
-  const yMin   = center - 2.5
-  const yMax   = center + 2.5
-  return { ticks, yMin, yMax }
+// ── Y-axis builder: 5 whole-number, evenly spaced ticks centered on live price ─
+// Step is 1 when the data is tight (e.g. live 1347 → 1345, 1346, 1347, 1348, 1349)
+// and grows (2, 5, 10...) only as much as needed so EVERY point stays visible.
+function buildYAxis(prices: number[], livePrice: number) {
+  const all = [...prices, livePrice]
+  const lo  = Math.floor(Math.min(...all))
+  const hi  = Math.ceil(Math.max(...all))
+  const needed = Math.max(hi - lo, 1)
+  const raw = Math.ceil(needed / 4)
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)))
+  const step = [1, 2, 5, 10].map(m => m * mag).find(s => s >= raw) ?? raw
+
+  // Center the 4-interval window on the live price, then shift it so the
+  // whole data range [lo, hi] is always inside.
+  let start = Math.round(livePrice) - 2 * step
+  if (start > lo) start = lo
+  if (start + 4 * step < hi) start = hi - 4 * step
+
+  const ticks = Array.from({ length: 5 }, (_, i) => start + i * step)
+  return { ticks, yMin: ticks[0], yMax: ticks[4] }
 }
 
 // ── Coordinate helpers ──────────────────────────────────────────────────────
@@ -106,7 +117,7 @@ export function PriceChart({ history, price, loading }: PriceChartProps) {
     const times  = history.map(r => r.updatedAt)
     const minT   = Math.min(...times),  maxT = Math.max(...times)
     const liveP  = price ?? prices[prices.length - 1]
-    const { ticks, yMin, yMax } = buildYAxis(liveP)
+    const { ticks, yMin, yMax } = buildYAxis(prices, liveP)
 
     // ── Y-axis labels + gridlines ─────────────────────────────────────────
     ctx.font      = '11px system-ui, sans-serif'
@@ -176,7 +187,7 @@ export function PriceChart({ history, price, loading }: PriceChartProps) {
       ctx.fill()
       ctx.shadowBlur  = 0
     }
-  }, [history])
+  }, [history, price])
 
   // ── Animate on new history ──────────────────────────────────────────────
   useEffect(() => {
@@ -235,14 +246,14 @@ export function PriceChart({ history, price, loading }: PriceChartProps) {
     const pt  = history[best]
     const prices = history.map(r => r.price)
     const liveP2 = price ?? prices[prices.length - 1]
-    const { yMin, yMax } = buildYAxis(liveP2)
+    const { yMin, yMax } = buildYAxis(prices, liveP2)
     const cx = toX(pt.updatedAt, minT, maxT, w)
     const cy = toY(pt.price, yMin, yMax, rect.height)
 
     if (timerRef.current) clearTimeout(timerRef.current)
     if (fadeRef.current)  clearInterval(fadeRef.current)
 
-    setTooltip({ price: pt.price, time: new Date(pt.updatedAt * 1000).toLocaleTimeString(), x: cx, y: cy, opacity: 1 })
+    setTooltip({ price: pt.price, time: new Date(pt.updatedAt * 1000).toLocaleTimeString(), x: Math.max(0, Math.min(cx + 12, w - 130)), y: cy, opacity: 1 })
 
     timerRef.current = setTimeout(() => {
       let op = 1
@@ -252,7 +263,7 @@ export function PriceChart({ history, price, loading }: PriceChartProps) {
         else setTooltip(prev => prev ? { ...prev, opacity: op } : null)
       }, 40)
     }, 10000)
-  }, [history])
+  }, [history, price])
 
   if (loading) return (
     <div style={{ borderRadius: 18, padding: 24, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
@@ -289,7 +300,7 @@ export function PriceChart({ history, price, loading }: PriceChartProps) {
         {tooltip && (
           <div style={{
             position: 'absolute',
-            left: Math.min(tooltip.x + 12, 210),
+            left: tooltip.x,
             top:  Math.max(tooltip.y - 48, 0),
             pointerEvents: 'none', opacity: tooltip.opacity,
             background: 'rgba(6,10,18,0.93)', border: '1px solid rgba(0,214,111,0.28)',
